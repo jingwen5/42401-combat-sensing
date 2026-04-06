@@ -11,6 +11,9 @@ BLEUart bleuart;
 MAX30105 sensor;
 LSM6DS3 myIMU(I2C_MODE, 0x6A);
 
+#define ENABLE_SERIAL_TEST 1
+#define DEBUG_IMU 0
+
 // PPG settings
 #define FS_HZ 100.0f          // Sampling rate (Hz) — must match sampleRate below
 #define WINDOW_SEC 5.0f       // PPG processing window length
@@ -764,6 +767,16 @@ FALL_STATES analyze_event_score() {
     scores[5] = score_sit(std_accel, std_gyro, max_asvm, min_asvm, angle_diff, skewness);
     scores[6] = score_squat(std_accel, std_gyro, max_asvm, min_asvm, angle_diff, skewness);
 
+    if(DEBUG_IMU) {
+      Serial.print("fall  score: "); Serial.print(scores[0]);
+      Serial.print("; limp  score: "); Serial.print(scores[1]); 
+      Serial.print("; run   score: "); Serial.print(scores[2]); 
+      Serial.print("; walk  score: "); Serial.print(scores[3]); 
+      Serial.print("; jump  score: "); Serial.print(scores[4]); 
+      Serial.print("; sit   score: "); Serial.print(scores[5]); 
+      Serial.print("; squat score: "); Serial.println(scores[6]);
+    }
+
     int high_score_idx = -1;
     int high_score = 0;
 
@@ -775,16 +788,24 @@ FALL_STATES analyze_event_score() {
             high_score_idx = i;
         }
     }
+    if(DEBUG_IMU) {
+      Serial.print("High score index: "); Serial.println(high_score_idx);
+    }
 
-    // additional fall vs. sit scoring pass to avoid false positives from ties
-    if((high_score_idx = 0) && (scores[0] == scores[5])) {
+    // require fall detection to include angle change to avoid hella false positives from priority ranking
+    if(high_score_idx == 0) {
       // discriminate based on angle only
       if(angle_diff >= TILT_TRIGGER) {
         return DETECTED_FALL;
       }
-      // no large angle difference, classify as sit
-      else {
+      else if((scores[4] >= scores[5]) && (scores[4] >= scores[6])) {
+        return JUMPING;
+      }
+      else if((scores[5] >= scores[4]) && (scores[5] >= scores[6])) {
         return SITTING;
+      }
+      else if((scores[6] >= scores[4]) && (scores[6] >= scores[5])) {
+        return SQUATTING;
       }
     }
 
@@ -806,11 +827,9 @@ FALL_STATES analyze_event_score() {
         }
     }
 }
-
-
 // M packet: ts(uint32), state(uint8), event_val(int16 x100), impact(int16 x100)
 void send_motion_packet() {
-  if (!Bluefruit.connected()) return;
+  if (!Bluefruit.connected() && !ENABLE_SERIAL_TEST) return;
 
   uint8_t pkt[10];
   pkt[0] = 'M';
@@ -828,11 +847,46 @@ void send_motion_packet() {
   bleuart.write(pkt, sizeof(pkt));
 }
 
+// send all data points for external analysis
+void send_motion_packet_serial() {
+  if(ENABLE_SERIAL_TEST) {
+    // also don't print every line if debugging
+    if(DEBUG_IMU && ((fall_state != IDLE_FALL) || (fall_state != CHECK_FALL) || (fall_state != STATIONARY_POST_FALL))) {
+      return;
+    }
+    char buffer[160];
+
+    // send accel values
+    snprintf(buffer, sizeof(buffer),
+            "%.3f,%.3f,%.3f",
+            cv.ax, cv.ay, cv.az);
+    Serial.print(buffer);
+
+    // send gyro values
+    snprintf(buffer, sizeof(buffer),
+            ",%.3f,%.3f,%.3f",
+            cv.gx, cv.gy, cv.gz);
+    Serial.print(buffer);
+
+    // send svm values
+    snprintf(buffer, sizeof(buffer),
+            ",%.3f,%.3f",
+            cv.A_SVM, cv.G_SVM);
+    Serial.print(buffer);
+      // send time and fall_event values
+    snprintf(buffer, sizeof(buffer),
+            ",%.lu,%.3f,",
+            cv.delta_time, cv.fall_event_val);
+    Serial.print(buffer);
+    Serial.println(fall_state_strings[fall_state]);
+  }
+}
+
 // Fills the event buffer one tick at a time after a low-accel trigger
 // Spread across loop() calls to avoid blocking PPG collection
 void handle_check_fall_tick() {
   update_values(true); // save values to the buffer now
-
+  send_motion_packet_serial();
   if (cv.A_SVM >= CHECK_TRIGGER) {
     if (!check_fall_large_accel) check_pos = check_fall_count;  // Mark where impact started
     check_fall_large_accel = true;
@@ -861,6 +915,7 @@ void handle_check_fall_tick() {
 
 void handle_stationary_tick() {
   update_values(true);
+  send_motion_packet_serial();
   stationary_count++;
 
   if (stationary_count >= BUF_SMALL) {
@@ -879,6 +934,7 @@ void handle_imu() {
   switch (fall_state) {
     case IDLE_FALL:
       update_values(false);  // No buffering needed — just watching for trigger
+      send_motion_packet_serial();
       cv.fall_event_val = 0.0f;
       cv.fall_impact = 0.0f;
 
@@ -923,6 +979,7 @@ void handle_imu() {
       // } else {
       //   initialize_values();  // Unclassifiable — reset and wait
       // }
+      send_motion_packet_serial();
       fall_state = analyze_event_score();
       // reset values for next clock if going back to IDLE
       if(fall_state == IDLE_FALL) {
@@ -934,6 +991,7 @@ void handle_imu() {
     case DETECTED_FALL:
       cv.fall_event_val = 1.0f;   // Flag value to distinguish fall packet from post-fall
       send_motion_packet();
+      send_motion_packet_serial();
       cv.fall_event_val = 0.0f;
       update_pos = 0; // reset buffer idx for stationary buffer analysis
       stationary_count = 0;
@@ -954,6 +1012,7 @@ void handle_imu() {
     case SITTING:
     case SQUATTING:
       send_motion_packet();
+      send_motion_packet_serial();
       initialize_values(); // reset state for new detection window
       break;
   }
@@ -989,6 +1048,11 @@ void setup() {
   initialize_values();
   cv.curr_time = millis();
   last_imu_ms = millis();
+  
+  if(ENABLE_SERIAL_TEST) {
+    Serial.begin(115200);
+    while(!Serial);
+  }
 }
 
 void loop() {
