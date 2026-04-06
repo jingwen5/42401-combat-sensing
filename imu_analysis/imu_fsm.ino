@@ -256,7 +256,6 @@ void update_values(bool update_buffers) {
         gy_buf[update_pos] = cv.gy;
         gz_buf[update_pos] = cv.gz;
 
-        // might not need
         asvm_buf[update_pos] = cv.A_SVM;
         gsvm_buf[update_pos] = cv.G_SVM;
 
