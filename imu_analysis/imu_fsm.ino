@@ -263,8 +263,10 @@ void update_values(bool update_buffers) {
         update_pos = (update_pos + 1) % BUF_SIZE;
 
         // update means
-        A_SVM_mean = (A_SVM_mean*(update_pos - 1))/(update_pos) + (cv.A_SVM)/(update_pos);
-        G_SVM_mean = (G_SVM_mean*(update_pos - 1))/(update_pos) + (cv.G_SVM)/(update_pos);
+        if (update_pos > 0) {
+        A_SVM_mean = (A_SVM_mean * (update_pos - 1)) / update_pos + cv.A_SVM / update_pos;
+        G_SVM_mean = (G_SVM_mean * (update_pos - 1)) / update_pos + cv.G_SVM / update_pos;
+        }
 
         // update if the data is valid or not
         if(!avg_valid & (update_pos >= BUF_SIZE)) {
@@ -572,7 +574,7 @@ float calculate_median(float* arr, int n) {
     float temp[n];
     memcpy(temp, arr, n * sizeof(float));
 
-    // insertion sort - efficient for small n (your BUF_SIZE ~50-200)
+    // insertion sort
     for (int i = 1; i < n; i++) {
         float key = temp[i];
         int j = i - 1;
@@ -626,7 +628,7 @@ float calculate_skewness() {
 }
 
 // score based next_state generation instead of all-or-nothing logic
-// if all scores are too high then go to IDLE
+// if all scores are too low then go to IDLE
 FALL_STATES analyze_event_score() {
 
     float std_accel = std_dev_check(ACCEL, BUF_SIZE);
