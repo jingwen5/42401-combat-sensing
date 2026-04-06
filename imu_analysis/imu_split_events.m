@@ -100,6 +100,7 @@ if __name__ == "__main__":
         "lilly",
         "shanaya",
         "iris",
+        "harry"
     ]
 
     process_folders(people)

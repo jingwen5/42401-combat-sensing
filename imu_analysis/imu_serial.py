@@ -76,12 +76,25 @@ def main():
         ])
 
         print("Recording… Press Ctrl+C to stop.")
+
+        lines_to_print = 0
+
         try:
             while True:
                 line = ser.readline().decode(errors="ignore")
                 parsed = parse_line(line)
                 if parsed is None:
                     continue
+
+                *_, label = parsed
+                # Trigger printing for the next 2 lines after ANALYZE_IMPACT
+                if label == "ANALYZE_IMPACT":
+                    print(f"  >> ANALYZE_IMPACT detected — watching next 2 states...")
+                    lines_to_print = 2
+
+                elif lines_to_print > 0:
+                    print(f"  >> Post-impact state: {label}")
+                    lines_to_print -= 1
 
                 writer.writerow([
                     datetime.now().isoformat(timespec="milliseconds"),
