@@ -1,5 +1,4 @@
 #include "LSM6DS3.h"
-<<<<<<<< HEAD:app/ble_stream_init/ble_stream.ino
 
 BLEUart bleuart;
 MAX30105 sensor;
@@ -163,9 +162,8 @@ const float RAD_TO_DEG_CONV = 57.295779f;
 #define SQUAT_TILT_DIFF_HI  16.1746f
 #define SQUAT_SKEWNESS_LO    0.8107f
 #define SQUAT_SKEWNESS_HI    1.5118f
-========
+
 #include "defines.h"
->>>>>>>> 41286d5c9c6775bd72c7b2a1681aa7837a1fd755:app/ble_stream/imu.ino
 
 // IMU calibration offsets — measured at rest, subtracted from raw readings
 double cal_gx = 1.101100;
@@ -264,20 +262,6 @@ void update_values(bool update_buffers) {
       avg_valid = true;
     }
   }
-
-#if DEBUG_SERIAL
-  // ax,ay,az,gx,gy,gz,asvm,gsvm,delta_time,fall_event_val,state
-  char buf[160];
-  snprintf(buf, sizeof(buf),
-    "%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%lu,%.3f,%s",
-    cv.ax, cv.ay, cv.az,
-    cv.gx, cv.gy, cv.gz,
-    cv.A_SVM, cv.G_SVM,
-    cv.delta_time, cv.fall_event_val,
-    fall_state_strings[fall_state].c_str());
-  Serial.println(buf);
-#endif
-}
 
 // Returns std-dev of the most recent DEV_BUFFER_SIZE samples from the circular buffer
 float std_dev_check(IMU_COMP dev_type, int buffer_size) {
@@ -570,20 +554,10 @@ FALL_STATES analyze_event_score() {
         }
     }
 }
-<<<<<<<< HEAD:app/ble_stream_init/ble_stream.ino
+
 // M packet: ts(uint32), state(uint8), event_val(int16 x100), impact(int16 x100)
 void send_motion_packet() {
   if (!Bluefruit.connected() && !ENABLE_SERIAL_TEST) return;
-========
-
-// M packet: ts(uint32), state(uint8), event_val(int16 x100), impact(int16 x100)
-void send_motion_packet() {
-#if DEBUG_SERIAL
-  Serial.print("IMU state: "); Serial.println(fall_state_strings[fall_state]);
-#else
-  if (!Bluefruit.connected()) return;
->>>>>>>> 41286d5c9c6775bd72c7b2a1681aa7837a1fd755:app/ble_stream/imu.ino
-
   uint8_t pkt[10];
   pkt[0] = 'M';
 
@@ -598,7 +572,6 @@ void send_motion_packet() {
   memcpy(&pkt[8], &impact_i, 2);
 
   bleuart.write(pkt, sizeof(pkt));
-#endif
 }
 
 // send all data points for external analysis
@@ -781,7 +754,6 @@ void handle_imu() {
       break;
   }
 }
-<<<<<<<< HEAD:app/ble_stream_init/ble_stream.ino
 
 void setup() {
   Wire.begin();
@@ -830,5 +802,3 @@ void loop() {
     handle_imu();
   }
 }
-========
->>>>>>>> 41286d5c9c6775bd72c7b2a1681aa7837a1fd755:app/ble_stream/imu.ino
