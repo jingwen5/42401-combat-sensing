@@ -308,6 +308,7 @@ class DashboardWindow(QMainWindow):
             "data_link_status": "ACTIVE",
             "spo2_low_since": None,       # Timestamp when SpO2 first dropped below monitor threshold
             "fall_detected_since": None,  # Timestamp when a confirmed fall was first seen
+            "vbat": None,  # Battery voltage in volts, None until first reading arrives
         }
 
     def rebuild_device_mapping(self):
@@ -610,6 +611,13 @@ class DashboardWindow(QMainWindow):
             last_move_sec = max(0, int(time.time() - state.get("last_motion_time", time.time())))
             age_val = info.age if info else None
             hr_zone_text = calculate_hr_zone(age_val, hr_val)
+            vbat_val = state.get("vbat")
+            if vbat_val is None:
+                vbat_text = "--"
+            else:
+                # Linear approximation of LiPo charge level: 3.0V = 0%, 4.2V = 100%
+                pct = max(0, min(100, int((vbat_val - 3.0) / (4.2 - 3.0) * 100)))
+                vbat_text = f"{pct}%"
 
             card.set_values(
                 "-- bpm" if hr_val == "--" else f"{hr_val} bpm",
@@ -618,6 +626,7 @@ class DashboardWindow(QMainWindow):
                 motion_text,
                 link_text,
                 f"{last_move_sec}s ago",
+                vbat_text,
             )
             card.set_hero_alerts(hr_val, spo2_val)
             card.set_status(status_text, status_kind)
@@ -657,6 +666,7 @@ class DashboardWindow(QMainWindow):
         spo2=None,
         motion_state=None,
         link_status="ACTIVE",
+        vbat=None,
     ):
         if not device_id:
             return
@@ -674,7 +684,9 @@ class DashboardWindow(QMainWindow):
         if motion_state is not None:
             updates["motion_state"] = motion_state
             updates["fall_detected"] = (motion_state in ("DETECTED_FALL", "STATIONARY_POST_FALL"))
-
+        if vbat is not None:
+            updates["vbat"] = vbat
+        
         self.update_soldier_data(soldier_id, **updates)
         self.refresh_ui_elements()
 

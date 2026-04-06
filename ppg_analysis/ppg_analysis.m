@@ -1,7 +1,7 @@
 % Analyze raw PPG daa and reference HR/SpO2 data
 %% Load data
-Tppg = readtable('data/ppg_raw_loc_d.csv');
-Tref = readtable('data/ppg_ref_loc_d.csv');
+Tppg = readtable('data/ppg_raw_loc_a.csv');
+Tref = readtable('data/ppg_ref_loc_a.csv');
 
 % Convert timestamps into datetime objects
 Tppg.timestamp = datetime(Tppg.timestamp, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSS');
