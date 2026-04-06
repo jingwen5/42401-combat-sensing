@@ -615,8 +615,8 @@ class DashboardWindow(QMainWindow):
             if vbat_val is None:
                 vbat_text = "--"
             else:
-                # Linear approximation of LiPo charge level: 3.0V = 0%, 4.2V = 100%
-                pct = max(0, min(100, int((vbat_val - 3.0) / (4.2 - 3.0) * 100)))
+                # Linear approximation of LiPo charge level: 2.0V = 0%, 3.4V = 100%
+                pct = max(0, min(100, int((vbat_val - 2.0) / (3.4 - 2.0) * 100)))
                 vbat_text = f"{pct}%"
 
             card.set_values(

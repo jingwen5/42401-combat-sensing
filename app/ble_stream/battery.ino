@@ -19,9 +19,9 @@ void send_battery_packet(float vbat) {
 }
 
 void battery_setup() {
-  // Pull PIN_VBAT low to enable the voltage divider on the battery pin
-  pinMode(PIN_VBAT, OUTPUT);
-  digitalWrite(PIN_VBAT, LOW);
+  // VBAT_ENABLE must be pulled low to turn on the voltage divider before reading
+  pinMode(VBAT_ENABLE, OUTPUT);
+  digitalWrite(VBAT_ENABLE, LOW);
 }
 
 void handle_battery() {
