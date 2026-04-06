@@ -209,7 +209,7 @@ class SoldierCard(QFrame):
         self.setObjectName("soldierCard")
         self.setCursor(Qt.PointingHandCursor)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setMinimumHeight(190)
+        self.setMinimumHeight(220)
 
         self.root_layout = QVBoxLayout(self)
         self.root_layout.setContentsMargins(18, 18, 18, 18)
@@ -265,11 +265,13 @@ class SoldierCard(QFrame):
         self.condition_row = self._make_detail_row("Activity", "--")
         self.link_row = self._make_detail_row("Link", "--")
         self.last_move_row = self._make_detail_row("Last Move", "--")
+        self.vbat_row = self._make_detail_row("Battery", "--")
 
         self.rows_layout.addWidget(self.hr_zone_row["container"])
         self.rows_layout.addWidget(self.condition_row["container"])
         self.rows_layout.addWidget(self.link_row["container"])
         self.rows_layout.addWidget(self.last_move_row["container"])
+        self.rows_layout.addWidget(self.vbat_row["container"])
 
         self.root_layout.addWidget(self.rows_container)
         self.root_layout.addStretch()
@@ -387,7 +389,7 @@ class SoldierCard(QFrame):
             }}
         """)
 
-    def set_values(self, hr_text, hr_zone_text, spo2_text, condition_text, link_text, last_move_text):
+    def set_values(self, hr_text, hr_zone_text, spo2_text, condition_text, link_text, last_move_text, vbat_text):
         # Update all displayed values — called by refresh_ui_elements in triage_gui
         self.hr_box.value_label.setText(hr_text)
         self.spo2_box.value_label.setText(spo2_text)
@@ -395,6 +397,7 @@ class SoldierCard(QFrame):
         self.condition_row["right"].setText(condition_text)
         self.link_row["right"].setText(link_text)
         self.last_move_row["right"].setText(last_move_text)
+        self.vbat_row["right"].setText(vbat_text)
 
     def set_hero_alerts(self, hr, spo2):
         # Color each hero box independently based on how critical that value is
@@ -464,25 +467,25 @@ class SoldierCard(QFrame):
                 "sid": 18, "name": 11, "pill": 9,
                 "hero_small": 9, "hero_value": 19,
                 "detail_left": 13, "detail_right": 14,
-                "margins": (16, 16, 16, 16),
-                "spacing": 8,
-                "hero_min_h": 82,
-                "hero_gap": 10,
-                "rows_top": 10,
-                "rows_spacing": 10,
-                "row_min_h": 36,
+                "margins": (12, 12, 12, 12),
+                "spacing": 6,
+                "hero_min_h": 65,
+                "hero_gap": 8,
+                "rows_top": 6,
+                "rows_spacing": 6,
+                "row_min_h": 28,
             },
             "group_5_8": {
                 "sid": 15, "name": 9, "pill": 8,
                 "hero_small": 8, "hero_value": 16,
                 "detail_left": 11, "detail_right": 12,
-                "margins": (13, 13, 13, 13),
-                "spacing": 6,
-                "hero_min_h": 68,
-                "hero_gap": 8,
-                "rows_top": 10,
-                "rows_spacing": 10,
-                "row_min_h": 28,
+                "margins": (10, 10, 10, 10),
+                "spacing": 4,
+                "hero_min_h": 62,
+                "hero_gap": 6,
+                "rows_top": 6,
+                "rows_spacing": 6,
+                "row_min_h": 22,
             },
         }
 
@@ -531,7 +534,7 @@ class SoldierCard(QFrame):
         self.hr_box.setMinimumHeight(s["hero_min_h"])
         self.spo2_box.setMinimumHeight(s["hero_min_h"])
 
-        for row in [self.hr_zone_row, self.condition_row, self.link_row, self.last_move_row]:
+        for row in [self.hr_zone_row, self.condition_row, self.link_row, self.last_move_row, self.vbat_row]:
             row["container"].setMinimumHeight(s["row_min_h"])
             row["left"].setFont(QFont("Bahnschrift SemiBold", s["detail_left"]))
             row["left"].setStyleSheet(

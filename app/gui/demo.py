@@ -98,6 +98,7 @@ class DemoController:
             # SpO2 drifts ±1% per tick, clamped to a plausible range
             new_spo2 = max(87, min(100, state["spo2"] + random.randint(-1, 1)))
             new_link = random.choice(link_states)
+            new_vbat = round(random.uniform(3.5, 4.2), 2)
 
             # Nudge HR to be consistent with motion state where possible
             if new_motion == "RUNNING" and zone_choice <= 2:
@@ -111,6 +112,7 @@ class DemoController:
                 spo2=new_spo2,
                 motion_state=new_motion,
                 link_status=new_link,
+                vbat=new_vbat,
             )
 
     def schedule_next_demo_update(self):
