@@ -1,5 +1,9 @@
 #pragma once
 
+// IMU serial data collection
+#define ENABLE_SERIAL_TEST 1
+#define DEBUG_IMU 0
+
 // IMU constants
 const float G = 9.81f;
 const float RAD_TO_DEG_CONV = 57.295779f;

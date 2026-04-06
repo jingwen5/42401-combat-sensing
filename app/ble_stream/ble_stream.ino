@@ -51,11 +51,12 @@ float min_float(const float *x, int n) {
 }
 
 void setup() {
-#if DEBUG_SERIAL
-  Serial.begin(115200);
-  while (!Serial);
-#endif
+  // if(ENABLE_SERIAL_TEST) {
+    Serial.begin(115200);
+    while (!Serial);
+  // }
 
+  Serial.println("serial connected");
   Wire.begin();
 
   Bluefruit.begin();
@@ -71,6 +72,7 @@ void setup() {
 }
 
 void loop() {
+  Serial.println("in loop");
   handle_ppg();
   handle_battery();
 
@@ -78,6 +80,7 @@ void loop() {
   uint32_t now = millis();
   if ((uint32_t)(now - last_imu_ms) >= LOOP_DELAY) {
     last_imu_ms += LOOP_DELAY;
+    Serial.println("handling imu");
     handle_imu();
   }
 }

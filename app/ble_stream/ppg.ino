@@ -14,6 +14,7 @@
 #define MIN_IR_DC 20000.0f    // Weak DC means finger is not on sensor
 #define MIN_IR_AC 100.0f      // Weak AC means no detectable pulse
 
+
 MAX30105 sensor;
 
 uint32_t ir_raw_buf[N_SAMPLES];
