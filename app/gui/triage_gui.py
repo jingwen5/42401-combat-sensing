@@ -54,6 +54,7 @@ SPO2_CRITICAL_THRESHOLD = 90      # SpO2 below this → CRITICAL after delay
 SPO2_ALERT_DURATION_SEC = 30      # How long SpO2 must be low before flagging
 FALL_CRITICAL_DURATION_SEC = 60   # Seconds person must be still after fall → CRITICAL
 
+from injury_classification import InjuryClassifier
 
 class DashboardWindow(QMainWindow):
     def __init__(self):
@@ -309,6 +310,7 @@ class DashboardWindow(QMainWindow):
             "spo2_low_since": None,       # Timestamp when SpO2 first dropped below monitor threshold
             "fall_detected_since": None,  # Timestamp when a confirmed fall was first seen
             "vbat": None,  # Battery voltage in volts, None until first reading arrives
+            "classifier": InjuryClassifier(),
         }
 
     def rebuild_device_mapping(self):
@@ -658,6 +660,17 @@ class DashboardWindow(QMainWindow):
                 state["fall_detected_since"] = time.time()
         else:
             state["fall_detected_since"] = None  # Reset once person is moving again
+        
+        classifier = state["classifier"]
+        classifier.update(
+            hr=state.get("hr"),
+            spo2=state.get("spo2"),
+            rr=state.get("rr"),
+            bp=state.get("bp"),
+            motion_state=state.get("motion_state"),
+        )
+        
+        state["injury_probabilities"] = classifier.calculate_injury_probabilities()
 
     def handle_incoming_packet(
         self,

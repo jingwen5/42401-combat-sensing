@@ -5,7 +5,7 @@
 
 // DEBUGGING MACROS
 #define DEBUG_ANGLE 1
-#define DEBUG_IMU 0
+#define DEBUG_IMU 1
 
 // constants
 const float G = 9.81;
