@@ -12,8 +12,9 @@ DP_BUF_TAG = 4
 MOTION_BUF_TAG = 5
 SI_BUF_TAG = 6
 
-# use as reference shock index for soldier
-NORMAL_SI = 0.8
+# use as reference shock index for soldier (normal range 0.5-0.7)
+NORMAL_SI = 0.7
+SI_SLOPE = 19
 
 class InjuryClassifier:
     def __init__(self):
@@ -45,7 +46,7 @@ class InjuryClassifier:
         if sp is not None:
             self.sp_buf.append(sp)
         if dp is not None:
-            self.sp_buf.append(dp)
+            self.dp_buf.append(dp)
         if motion_state is not None:
             self.motion_buf.append(motion_state)
         
@@ -64,8 +65,6 @@ class InjuryClassifier:
             case 5: buf = self.motion_buf
             case 6: buf = self.shock_index_buf
             case _: raise ValueError(f"Unknown buffer_tag: {buffer_tag}")
-
-        # valid_samples = len(self.motion_buf) if (buffer_tag == MOTION_BUF_TAG) else len(self.hr_buf)        
         
         # not enough valid data in the buffer
         if(len(buf) < end_idx):
@@ -75,49 +74,23 @@ class InjuryClassifier:
         
         return (curr_sum / (end_idx - start_idx))
             
-    # calculate probability of hemorrhage and 
-    # likely blood volume loss, return tuple (hemorrhage_probability, bv_loss_lo, bv_loss_hi)
+    # sets predicted blood loss (ml/kg) based on shock index
+    # also sets probability of hemorrhage
     def calculate_hemorrhage(self):
-        # bv_loss_lo = 0
-        # bv_loss_hi = 0
-        # hh_prob = 0
-
-        # avg_hr = self.calculate_average(0, WINDOW_SIZE, HR_BUF_TAG)
-        # avg_sp = self.calculate_average(0, WINDOW_SIZE, SP_BUF_TAG)
-        # avg_dp = self.calculate_average(0, WINDOW_SIZE, DP_BUF_TAG)
-        # avg_rr = self.calculate_average(0, WINDOW_SIZE, RR_BUF_TAG)
-        
-        # if((avg_hr is None) or (avg_sp is None) or (avg_dp is None) or (avg_rr is None)):
-        #     return None
-        
-        
-        
-        # if((avg_hr < 100) and ((avg_rr >= 14) and (avg_rr < 20))):
-        #     bv_loss_lo = 0
-        #     bv_loss_hi = 15
-        #     hh_prob = 0.05
-        # elif((avg_hr >= 100) and (avg_hr < 120) and (avg_rr >= 20) and (avg_rr < 30)):
-        #     bv_loss_lo = 15
-        #     bv_loss_hi = 30
-        #     hh_prob = 0.55
-        # elif((avg_hr >= 120) and (avg_hr < 140) and (avg_rr >= 30) and (avg_rr < 40)):
-        #     bv_loss_lo = 30
-        #     bv_loss_hi = 40
-        #     hh_prob = 0.8
-        # elif((avg_hr >= 140) and (avg_rr >= 30) and (avg_rr < 40)):
-        #     bv_loss_lo = 40
-        #     bv_loss_hi = 100
-        #     hh_prob = 0.95
-        
-        # self.hemorrhage = hh_prob
-        # self.hemorrhage_bv_loss_lo = bv_loss_lo
-        # self.hemorrhage_bv_loss_hi = bv_loss_hi
-            
-        # return (hh_prob, bv_loss_lo, bv_loss_hi)
+        if(len(self.shock_index_buf) < 20):
+            return None
         
         avg_si_recent = self.calculate_average(len(self.shock_index_buf) - 20, len(self.shock_index_buf), SI_BUF_TAG)
-        self.hemorrhage_bv_loss = (avg_si_recent - NORMAL_SI)/(NORMAL_SI) * 0.0475 - 0.0552
-    
+        if(avg_si_recent is not None):
+            
+            # force curve through origin to avoid mispredicting blood loss when SI is normal
+            self.hemorrhage_bv_loss = (avg_si_recent - NORMAL_SI)/(NORMAL_SI) * SI_SLOPE
+            hem_tmp = max((avg_si_recent - NORMAL_SI)*5, 0)
+            self.hemorrhage = min(hem_tmp, 1)
+            return max(0.0, self.hemorrhage_bv_loss)
+        else:
+            return None
+        
     # calculate probability of hemothorax
     def calculate_hemothorax(self):
         pass
