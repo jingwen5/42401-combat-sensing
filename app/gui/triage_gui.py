@@ -54,7 +54,6 @@ SPO2_CRITICAL_THRESHOLD = 90      # SpO2 below this → CRITICAL after delay
 SPO2_ALERT_DURATION_SEC = 30      # How long SpO2 must be low before flagging
 FALL_CRITICAL_DURATION_SEC = 60   # Seconds person must be still after fall → CRITICAL
 
-
 class DashboardWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -86,6 +85,7 @@ class DashboardWindow(QMainWindow):
         self.card_widgets: Dict[str, SoldierCard] = {}      # soldier_id → card widget
         self.selected_ids: List[str] = []                   # currently displayed soldier IDs
         self.live_pulse_on = True                           # toggled each refresh for pulse animation
+        self.last_battery_pct = None
 
         self._build_ui()
         self._apply_styles()
@@ -592,7 +592,30 @@ class DashboardWindow(QMainWindow):
 
         # All active motion states are stable — person is moving normally
         return "STABLE", "STABLE"
-
+    
+    def get_battery_display(self, vbat_val):
+        if vbat_val is None:
+            return "🔋 --", TEXT_DIM
+        
+        pct = max(0, min(100, int((vbat_val - 3.0) / (4.2 - 3.0) * 100)))
+        
+        if self.last_battery_pct is None:
+            self.last_battery_pct = pct
+        else:
+            self.last_battery_pct = int(0.8 * self.last_battery_pct + 0.2 * pct)
+        
+        p = self.last_battery_pct
+        if p > 75:
+            return "█████", "#4caf50"        # full
+        elif p > 50:
+            return "████░", "#8bc34a"        # good
+        elif p > 25:
+            return "███░░", "#f5a623"   # medium — orange
+        elif p > 10:
+            return "██░░░", "#e05252"   # low — red
+        else:
+            return "█░░░░", "#e05252"   # critical — red
+    
     def refresh_ui_elements(self):
         # Toggle pulse dot color each call to create a blinking animation
         self.live_pulse_on = not self.live_pulse_on
@@ -612,12 +635,8 @@ class DashboardWindow(QMainWindow):
             age_val = info.age if info else None
             hr_zone_text = calculate_hr_zone(age_val, hr_val)
             vbat_val = state.get("vbat")
-            if vbat_val is None:
-                vbat_text = "--"
-            else:
-                # Linear approximation of LiPo charge level: 2.0V = 0%, 3.4V = 100%
-                pct = max(0, min(100, int((vbat_val - 2.0) / (3.4 - 2.0) * 100)))
-                vbat_text = f"{pct}%"
+
+            vbat_text, vbat_color = self.get_battery_display(vbat_val)
 
             card.set_values(
                 "-- bpm" if hr_val == "--" else f"{hr_val} bpm",
@@ -627,6 +646,7 @@ class DashboardWindow(QMainWindow):
                 link_text,
                 f"{last_move_sec}s ago",
                 vbat_text,
+                vbat_color,
             )
             card.set_hero_alerts(hr_val, spo2_val)
             card.set_status(status_text, status_kind)

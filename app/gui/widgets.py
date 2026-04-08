@@ -389,7 +389,7 @@ class SoldierCard(QFrame):
             }}
         """)
 
-    def set_values(self, hr_text, hr_zone_text, spo2_text, condition_text, link_text, last_move_text, vbat_text):
+    def set_values(self, hr_text, hr_zone_text, spo2_text, condition_text, link_text, last_move_text, vbat_text, vbat_color=None):
         # Update all displayed values — called by refresh_ui_elements in triage_gui
         self.hr_box.value_label.setText(hr_text)
         self.spo2_box.value_label.setText(spo2_text)
@@ -398,6 +398,10 @@ class SoldierCard(QFrame):
         self.link_row["right"].setText(link_text)
         self.last_move_row["right"].setText(last_move_text)
         self.vbat_row["right"].setText(vbat_text)
+        if vbat_color:
+            self.vbat_row["right"].setStyleSheet(
+                f"color: {vbat_color}; background: transparent; border: none;"
+            )
 
     def set_hero_alerts(self, hr, spo2):
         # Color each hero box independently based on how critical that value is

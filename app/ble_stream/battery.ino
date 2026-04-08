@@ -5,6 +5,10 @@ uint32_t last_bat_ms = 0;
 // B packet: ts(uint32), vbat(int16 x100)
 // voltage scaled by 100 to avoid floats over BLE
 void send_battery_packet(float vbat) {
+#if BAT_SERIAL
+  Serial.print("BAT vbat: "); Serial.println(vbat);
+#endif
+
   if (!Bluefruit.connected()) return;
 
   int16_t vbat_i = (int16_t)lroundf(vbat * 100.0f);
@@ -32,6 +36,6 @@ void handle_battery() {
 
   // analogRead blocks briefly but at 30s intervals it won't disrupt BLE
   int raw = analogRead(PIN_VBAT);
-  float vbat = (float)raw / 1340 * 3.3f;
+  float vbat = (float)raw * (4.08f / 377.0f);
   send_battery_packet(vbat);
 }

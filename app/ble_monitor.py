@@ -97,7 +97,10 @@ STATE_NAMES = {
     4: "STATIONARY_POST_FALL",
     5: "WALKING",
     6: "RUNNING",
-    7: "JUMPING_OR_QUICK_SIT",
+    7: "JUMPING",
+    8: "LIMPING",
+    9: "SITTING",
+    10: "SQUATTING",
 }
 
 def reset_state():

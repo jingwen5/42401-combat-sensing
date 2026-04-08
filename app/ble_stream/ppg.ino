@@ -97,10 +97,11 @@ int find_peaks(const float *x, int n, int min_peak_dist, int *locs) {
 // R packet: ts(uint32), hr(int16 x100), spo2(int16 x100)
 // Values are scaled by 100 to avoid floats over BLE; -1 signals invalid/no reading
 void send_result(float hr, float spo2) {
-#if DEBUG_SERIAL
+#if PPG_SERIAL
   // hr and spo2 are computed per-window, not per-sample, so print once per window
   Serial.print("PPG hr: "); Serial.print(hr); Serial.print(", spo2: "); Serial.println(spo2);
-#else
+#endif
+
   if (!Bluefruit.connected()) return;
 
   int16_t hr_i = isnan(hr) ? -1 : (int16_t)lroundf(hr * 100.0f);
@@ -113,7 +114,6 @@ void send_result(float hr, float spo2) {
   memcpy(&pkt[7], &spo2_i, 2);
 
   bleuart.write(pkt, sizeof(pkt));
-#endif
 }
 
 void process_window() {
@@ -173,7 +173,7 @@ void process_window() {
     ir_norm[i] = ir_filt[i] / ir_std;
   }
 
-  // Minimum 0.4s between peaks — rejects anything faster than 200 bpm
+  // Minimum 0.3s between peaks — rejects anything faster than 200 bpm
   int min_peak_dist = (int)roundf(FS_HZ * 0.3f);
   if (min_peak_dist > Nt - 2) min_peak_dist = Nt - 2;
   if (min_peak_dist < 1) {
@@ -215,12 +215,12 @@ void ppg_setup() {
   }
 
   sensor.setup(
-    60,    // LED brightness (0–255)
-    1,     // sampleAverage — 1 means no averaging, true 100 Hz into FIFO
-    2,     // ledMode — 2 = red + IR (required for SpO2)
-    100,   // sampleRate (Hz) — must match FS_HZ
-    411,   // pulseWidth (µs) — longer = more ADC bits, higher SNR
-    4096   // adcRange — maximum range for high-perfusion signals
+    60,              // LED brightness (0–255)
+    1,               // sampleAverage — 1 means no averaging, true FS_HZ into FIFO
+    2,               // ledMode — 2 = red + IR (required for SpO2)
+    (int)FS_HZ,      // sampleRate (Hz) — driven by FS_HZ defined above
+    411,             // pulseWidth (µs) — longer = more ADC bits, higher SNR
+    4096             // adcRange — maximum range for high-perfusion signals
   );
 }
 
@@ -232,8 +232,8 @@ void handle_ppg() {
     uint32_t ir_raw  = sensor.getFIFOIR();
     uint32_t red_raw = sensor.getFIFORed();
 
-#if DEBUG_SERIAL
-    // Print raw samples in the same format as ppg_serial_stream.ino
+#if PPG_SERIAL
+    // Print raw samples: ir,red
     Serial.print(ir_raw);
     Serial.print(",");
     Serial.println(red_raw);
