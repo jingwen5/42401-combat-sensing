@@ -23,14 +23,6 @@ DEVICE_ID = "DEV_001"
 # How often the UI refreshes independent of incoming BLE data (ms)
 UI_REFRESH_INTERVAL_MS = 1000
 
-# data buffers for derivative calculations, collect over a fixed window size
-STAT_WINDOW_SIZE = 100
-spo2_buf = []
-hr_buf =   []
-# add when implemented later
-rr_buf =   []
-bp_buf =   []
-
 
 class BLEBridge(QObject):
     # Qt signals are used to safely pass data from the BLE thread to the GUI thread
@@ -55,9 +47,6 @@ class BLEBackend:
 
     def _on_disconnect(self):
         self.bridge.link_changed.emit(DEVICE_ID, "LOST")
-        
-    def update_stats(self, spo2_in, hr_in, rr_in, bp_in):
-        pass
 
     def handle_notification(self, sender, data):
         for decoded in self.parser.feed(data):
@@ -67,7 +56,6 @@ class BLEBackend:
                 _, ts, hr, spo2 = decoded
                 hr_str = "---" if hr is None else f"{hr:.2f}"
                 spo2_str = "---" if spo2 is None else f"{spo2:.2f}"
-                self.update_stats(spo2, hr, 0, 0)
                 print(f"[BLE RX][PPG] hr={hr_str} bpm spo2={spo2_str} %")
                 self.bridge.ppg_received.emit(DEVICE_ID, hr, spo2)
 
