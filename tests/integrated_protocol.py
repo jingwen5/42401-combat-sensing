@@ -30,7 +30,7 @@ PROTOCOL_STEPS = [
     ("SIT_QUICK",      30, "Sit down quickly from standing, then remain seated."),
 ]
 
-# Must match STATE_NAMES in ble_monitor.py
+# Must match STATE_NAMES in ble_monitor.py and FALL_STATES enum in defines.h
 STATE_NAMES = {
     0: "IDLE_FALL",
     1: "CHECK_FALL",
@@ -49,6 +49,7 @@ FIELDNAMES = [
     "time", "activity_label",
     "ble_hr", "ble_spo2",
     "imu_state", "imu_event_val", "imu_impact",
+    "ble_rr", "ble_sbp", "ble_dbp", "ble_vbat",
     "ref_hr", "ref_spo2",
 ]
 
@@ -82,7 +83,7 @@ class PacketParser:
                 ts     = struct.unpack_from("<I", pkt, 1)[0]
                 hr_i   = struct.unpack_from("<h", pkt, 5)[0]
                 spo2_i = struct.unpack_from("<h", pkt, 7)[0]
-                hr   = None if hr_i   < 0 else hr_i   / 100.0  # Negative = invalid reading
+                hr   = None if hr_i   < 0 else hr_i   / 100.0
                 spo2 = None if spo2_i < 0 else spo2_i / 100.0
                 decoded.append(("R", ts, hr, spo2))
 
@@ -96,6 +97,38 @@ class PacketParser:
                 event_i  = struct.unpack_from("<h", pkt, 6)[0]
                 impact_i = struct.unpack_from("<h", pkt, 8)[0]
                 decoded.append(("M", ts, state, event_i / 100.0, impact_i / 100.0))
+
+            elif ptype == "W":  # RR packet: ts(u32) rr(i16 x100)
+                if len(self.buf) < 7:
+                    break
+                pkt = bytes(self.buf[:7])
+                del self.buf[:7]
+                ts   = struct.unpack_from("<I", pkt, 1)[0]
+                rr_i = struct.unpack_from("<h", pkt, 5)[0]
+                rr   = None if rr_i < 0 else rr_i / 100.0
+                decoded.append(("W", ts, rr))
+
+            elif ptype == "P":  # BP packet: ts(u32) sbp(i16 x10) dbp(i16 x10)
+                if len(self.buf) < 9:
+                    break
+                pkt = bytes(self.buf[:9])
+                del self.buf[:9]
+                ts    = struct.unpack_from("<I", pkt, 1)[0]
+                sbp_i = struct.unpack_from("<h", pkt, 5)[0]
+                dbp_i = struct.unpack_from("<h", pkt, 7)[0]
+                sbp   = None if sbp_i < 0 else sbp_i / 10.0
+                dbp   = None if dbp_i < 0 else dbp_i / 10.0
+                decoded.append(("P", ts, sbp, dbp))
+
+            elif ptype == "B":  # Battery packet: ts(u32) vbat(i16 x100)
+                if len(self.buf) < 7:
+                    break
+                pkt = bytes(self.buf[:7])
+                del self.buf[:7]
+                ts     = struct.unpack_from("<I", pkt, 1)[0]
+                vbat_i = struct.unpack_from("<h", pkt, 5)[0]
+                vbat   = vbat_i / 100.0
+                decoded.append(("B", ts, vbat))
 
             else:  # Unknown byte — skip and realign
                 del self.buf[0]
@@ -128,6 +161,22 @@ def handle_notification(sender, data: bytearray):
             row["imu_event_val"] = f"{event_val:.2f}"
             row["imu_impact"]    = f"{impact:.2f}"
             print(f"[IMU] {row['imu_state']}  event={event_val:.2f}  impact={impact:.2f}")
+
+        elif ptype == "W":
+            _, ts, rr = pkt
+            row["ble_rr"] = "" if rr is None else f"{rr:.2f}"
+            print(f"[RR] {row['ble_rr']} BrPM")
+
+        elif ptype == "P":
+            _, ts, sbp, dbp = pkt
+            row["ble_sbp"] = "" if sbp is None else f"{sbp:.1f}"
+            row["ble_dbp"] = "" if dbp is None else f"{dbp:.1f}"
+            print(f"[BP] SBP={row['ble_sbp']}  DBP={row['ble_dbp']} mmHg")
+
+        elif ptype == "B":
+            _, ts, vbat = pkt
+            row["ble_vbat"] = f"{vbat:.2f}"
+            print(f"[BAT] {row['ble_vbat']} V")
 
         with row_lock:
             data_rows.append(row)

@@ -1,2 +1,4 @@
 bleak
 pyserial
+PySide6
+Flask

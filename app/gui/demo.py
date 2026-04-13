@@ -1,4 +1,3 @@
-# demo.py
 import random
 import sys
 
@@ -46,7 +45,7 @@ class DemoController:
         if not self.window.device_to_soldier:
             return
 
-        # Real firmware motion states only — weighted toward normal activity
+        # Real firmware motion states only - weighted toward normal activity
         motion_states = [
             "IDLE_FALL",              # normal monitoring, no trigger
             "IDLE_FALL",
@@ -58,7 +57,7 @@ class DemoController:
             "DETECTED_FALL",
             "STATIONARY_POST_FALL",
         ]
-        # LOST is rare — BLE is generally reliable in demo
+        # LOST is rare - BLE is generally reliable in demo
         link_states = ["ACTIVE", "ACTIVE", "ACTIVE", "ACTIVE", "LOST"]
 
         # Each tick updates a random subset of devices to simulate staggered data arrival
@@ -101,11 +100,62 @@ class DemoController:
             new_vbat = round(random.uniform(3.5, 4.2), 2)
             new_rr = round(random.uniform(12, 20), 1)
 
+            # Simulate blood pressure - correlate loosely with HR zone
+            if zone_choice <= 2:
+                new_sbp = random.randint(105, 125)
+                new_dbp = random.randint(65, 78)
+            elif zone_choice <= 4:
+                new_sbp = random.randint(125, 145)
+                new_dbp = random.randint(75, 88)
+            else:
+                new_sbp = random.randint(140, 165)
+                new_dbp = random.randint(82, 95)
+
             # Nudge HR to be consistent with motion state where possible
             if new_motion == "RUNNING" and zone_choice <= 2:
                 new_hr = random.randint(int(max_hr * 0.70), int(max_hr * 0.88))
             if new_motion == "IDLE_FALL" and zone_choice >= 5:
                 new_hr = random.randint(int(max_hr * 0.65), int(max_hr * 0.85))
+
+            # Occasionally inject multi-vital injury scenarios
+            if random.random() < 0.08:
+                scenario = random.choice([
+                    "hemorrhage_class2",
+                    "hemorrhage_class3",
+                    "pneumothorax_early",
+                    "pneumothorax_late",
+                    "high_shock_index",
+                ])
+                if scenario == "hemorrhage_class2":
+                    # Class II: HR 100-120, BP decreased (<100), RR 20-30
+                    new_hr = random.randint(100, 120)
+                    new_rr = round(random.uniform(20, 30), 1)
+                    new_sbp = random.randint(80, 95)
+                    new_dbp = random.randint(50, 65)
+                elif scenario == "hemorrhage_class3":
+                    # Class III-IV: HR >120, BP decreased, RR >30
+                    new_hr = random.randint(125, 150)
+                    new_rr = round(random.uniform(31, 40), 1)
+                    new_sbp = random.randint(65, 90)
+                    new_dbp = random.randint(40, 55)
+                elif scenario == "pneumothorax_early":
+                    # Early: HR >=110, RR >=25, SpO2 dropping (<96)
+                    new_hr = random.randint(110, 130)
+                    new_rr = round(random.uniform(25, 32), 1)
+                    new_spo2 = random.randint(92, 95)
+                elif scenario == "pneumothorax_late":
+                    # Late/tension: HR >=140, RR >30, SpO2 <90, SBP <80
+                    new_hr = random.randint(150, 170)
+                    new_rr = round(random.uniform(33, 40), 1)
+                    new_spo2 = random.randint(83, 89)
+                    new_sbp = random.randint(50, 75)
+                    new_dbp = random.randint(25, 45)
+                elif scenario == "high_shock_index":
+                    # SI >= 1.0 with another abnormal vital
+                    new_sbp = random.randint(85, 98)
+                    new_hr = random.randint(new_sbp, new_sbp + 20)  # SI >= 1.0
+                    new_rr = round(random.uniform(22, 28), 1)       # mildly elevated
+                    new_dbp = random.randint(50, 60)
 
             self.window.handle_incoming_packet(
                 device_id=device_id,
@@ -115,6 +165,8 @@ class DemoController:
                 link_status=new_link,
                 vbat=new_vbat,
                 rr=new_rr,
+                sbp=new_sbp,
+                dbp=new_dbp,
             )
 
     def schedule_next_demo_update(self):

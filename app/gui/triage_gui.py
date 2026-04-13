@@ -48,11 +48,14 @@ from theme import (
 )
 from widgets import AddSoldierDialog, SoldierCard
 
-# Alert thresholds — adjust these to tune sensitivity
-SPO2_MONITOR_THRESHOLD = 95       # SpO2 below this → MONITOR after delay
-SPO2_CRITICAL_THRESHOLD = 90      # SpO2 below this → CRITICAL after delay
-SPO2_ALERT_DURATION_SEC = 30      # How long SpO2 must be low before flagging
-FALL_CRITICAL_DURATION_SEC = 60   # Seconds person must be still after fall → CRITICAL
+# Triage configuration
+PATTERN_PERSIST_SEC = 15            # hemorrhage / pneumothorax / SI patterns
+FALL_CRITICAL_DURATION_SEC = 60     # still on ground post-fall -> CRITICAL
+
+# "Normal" baselines
+SBP_NORMAL_FLOOR = 100   # SBP below this counts as "decreased" in patterns
+SPO2_NORMAL_FLOOR = 96   # SpO2 below this counts as "dropping" in patterns
+
 
 class DashboardWindow(QMainWindow):
     def __init__(self):
@@ -67,8 +70,6 @@ class DashboardWindow(QMainWindow):
             win_w = min(1360, max(980, avail.width() - 40))
             win_h = min(860, max(620, avail.height() - 40))
             self.resize(win_w, win_h)
-
-            # Minimum size that supports 5–8 panels without clipping
             self.setMinimumSize(1260, 820)
 
             x = avail.x() + (avail.width() - win_w) // 2
@@ -79,12 +80,12 @@ class DashboardWindow(QMainWindow):
             self.setMinimumSize(900, 560)
 
         # Core data stores
-        self.roster: Dict[str, SoldierInfo] = {}            # soldier_id → SoldierInfo
-        self.device_to_soldier: Dict[str, str] = {}         # device_id → soldier_id
-        self.soldier_state: Dict[str, dict] = {}            # soldier_id → live state dict
-        self.card_widgets: Dict[str, SoldierCard] = {}      # soldier_id → card widget
-        self.selected_ids: List[str] = []                   # currently displayed soldier IDs
-        self.live_pulse_on = True                           # toggled each refresh for pulse animation
+        self.roster: Dict[str, SoldierInfo] = {}
+        self.device_to_soldier: Dict[str, str] = {}
+        self.soldier_state: Dict[str, dict] = {}
+        self.card_widgets: Dict[str, SoldierCard] = {}
+        self.selected_ids: List[str] = []
+        self.live_pulse_on = True
         self.last_battery_pct = None
 
         self._build_ui()
@@ -141,7 +142,6 @@ class DashboardWindow(QMainWindow):
         select_label.setStyleSheet(f"color: {TEXT_SOFT}; font-weight: 800; font-size: 12px;")
         sidebar_layout.addWidget(select_label)
 
-        # Multi-select list — selecting items here triggers card rendering
         self.soldier_list = QListWidget()
         self.soldier_list.setSelectionMode(QListWidget.MultiSelection)
         self.soldier_list.itemSelectionChanged.connect(self.on_roster_select)
@@ -178,7 +178,6 @@ class DashboardWindow(QMainWindow):
         header.addLayout(title_col)
         header.addStretch()
 
-        # Pulsing dot in the header to indicate live data flow
         live_row = QHBoxLayout()
         live_row.setSpacing(5)
 
@@ -193,12 +192,10 @@ class DashboardWindow(QMainWindow):
 
         main_layout.addLayout(header)
 
-        # Shown only when no soldiers are selected
         self.empty_label = QLabel("Select up to eight IDs from the roster.")
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setStyleSheet(f"color: {TEXT_DIM}; font-size: 13px;")
 
-        # Grid that holds the soldier cards — rebuilt whenever selection changes
         self.cards_container = QWidget()
         self.cards_layout = QGridLayout(self.cards_container)
         self.cards_layout.setContentsMargins(0, 0, 0, 0)
@@ -298,7 +295,6 @@ class DashboardWindow(QMainWindow):
         """)
 
     def make_default_state(self):
-        # Used when a soldier is added before any BLE data has arrived
         return {
             "hr": None,
             "spo2": None,
@@ -306,16 +302,22 @@ class DashboardWindow(QMainWindow):
             "fall_detected": False,
             "last_motion_time": time.time(),
             "data_link_status": "ACTIVE",
-            "spo2_low_since": None,       # Timestamp when SpO2 first dropped below monitor threshold
-            "fall_detected_since": None,  # Timestamp when a confirmed fall was first seen
-            "vbat": None,                 # Battery voltage in volts, None until first reading arrives
+            "vbat": None,
             "rr": None,
             "sbp": None,
             "dbp": None,
+
+            # Persistence timers
+            "hemorrhage_monitor_since": None,
+            "hemorrhage_critical_since": None,
+            "pneumo_monitor_since": None,
+            "pneumo_critical_since": None,
+            "shock_index_monitor_since": None,
+            "shock_index_critical_since": None,
+            "fall_detected_since": None,
         }
 
     def rebuild_device_mapping(self):
-        # Rebuild the device_id → soldier_id lookup used by handle_incoming_packet
         self.device_to_soldier.clear()
         for sid, info in self.roster.items():
             device_id = str(info.device_id).strip()
@@ -326,7 +328,6 @@ class DashboardWindow(QMainWindow):
         if selected_ids is None:
             selected_ids = []
 
-        # Block signals while rebuilding to avoid triggering on_roster_select mid-update
         self.soldier_list.blockSignals(True)
         self.soldier_list.clear()
 
@@ -337,7 +338,6 @@ class DashboardWindow(QMainWindow):
             self.soldier_list.addItem(item)
 
         if select_first and roster_ids:
-            # Auto-select up to the display limit on first load
             limit = min(MAX_DISPLAYED_SOLDIERS, len(roster_ids))
             for i in range(limit):
                 self.soldier_list.item(i).setSelected(True)
@@ -361,7 +361,6 @@ class DashboardWindow(QMainWindow):
     def open_add_soldier_dialog(self):
         dlg = AddSoldierDialog(self)
 
-        # Centre the dialog over the parent window
         screen = self.screen() or QApplication.primaryScreen()
         if screen is not None:
             avail = screen.availableGeometry()
@@ -400,7 +399,6 @@ class DashboardWindow(QMainWindow):
         self.soldier_state[sid] = self.make_default_state()
         self.rebuild_device_mapping()
 
-        # Auto-select the new soldier if there's room in the display
         if len(current_selected) < MAX_DISPLAYED_SOLDIERS:
             current_selected.append(sid)
 
@@ -420,7 +418,6 @@ class DashboardWindow(QMainWindow):
             with open(path, "r", newline="", encoding="utf-8-sig") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    # Support multiple common column name variants
                     sid = (row.get("soldier_id") or row.get("id") or "").strip()
                     name = (row.get("name") or row.get("callsign") or sid).strip()
                     device_id = (
@@ -450,7 +447,6 @@ class DashboardWindow(QMainWindow):
                 raise ValueError("No valid rows found. Expected soldier_id/id and device_id columns.")
 
             self.roster = new_roster
-            # Preserve existing live state for soldiers that were already loaded
             self.soldier_state = {
                 sid: self.soldier_state.get(sid, self.make_default_state())
                 for sid in self.roster
@@ -465,7 +461,6 @@ class DashboardWindow(QMainWindow):
         items = self.soldier_list.selectedItems()
         selected_ids = [item.data(Qt.UserRole) for item in items]
 
-        # Enforce display limit — deselect the last item if over the cap
         if len(selected_ids) > MAX_DISPLAYED_SOLDIERS:
             self.soldier_list.blockSignals(True)
             items[-1].setSelected(False)
@@ -481,7 +476,6 @@ class DashboardWindow(QMainWindow):
         self.render_cards()
 
     def get_grid_columns(self, count):
-        # Column count determines card size — fewer cards = larger cards
         if count <= 1:
             return 1
         if count == 2:
@@ -491,7 +485,6 @@ class DashboardWindow(QMainWindow):
         return 4
 
     def get_scale_name(self, count):
-        # Scale name passed to each card so it can adjust font sizes accordingly
         if count == 1:
             return "group_1"
         if count == 2:
@@ -501,7 +494,6 @@ class DashboardWindow(QMainWindow):
         return "group_5_8"
 
     def clear_cards(self):
-        # Remove all card widgets from the grid before rebuilding
         while self.cards_layout.count():
             item = self.cards_layout.takeAt(0)
             widget = item.widget()
@@ -523,7 +515,6 @@ class DashboardWindow(QMainWindow):
         rows = math.ceil(count / cols)
         scale_name = self.get_scale_name(count)
 
-        # Reset all stretch factors before applying new ones
         for i in range(6):
             self.cards_layout.setColumnStretch(i, 0)
             self.cards_layout.setRowStretch(i, 0)
@@ -546,7 +537,6 @@ class DashboardWindow(QMainWindow):
         self.refresh_ui_elements()
 
     def toggle_card_selection(self, sid):
-        # Clicking a card toggles its selection in the sidebar list
         for i in range(self.soldier_list.count()):
             item = self.soldier_list.item(i)
             if item.data(Qt.UserRole) == sid:
@@ -555,72 +545,163 @@ class DashboardWindow(QMainWindow):
         self.on_roster_select()
 
     def resizeEvent(self, event):
-        # Re-render cards on window resize so layout stays correct
         super().resizeEvent(event)
         self.render_cards()
 
-    def get_status_for_state(self, state):
-        spo2 = state.get("spo2") or 100
-        motion = state.get("motion_state") or ""
-        link = state.get("data_link_status", "ACTIVE")
-        spo2_low_since = state.get("spo2_low_since")
-        fall_detected_since = state.get("fall_detected_since")
-        now = time.time()
+    # Triage status engine - multi-vital injury pattern matching
+    # Patterns derived from:
+    #   - ATLS hemorrhage classification (Classes I–IV)
+    #   - Tension pneumothorax progression timeline
+    #   - Shock index literature (HR / SBP)
+    @staticmethod
+    def _persisted(since_ts, required_sec):
+        """Return True if the condition has been active for at least
+        *required_sec* seconds."""
+        if since_ts is None:
+            return False
+        return (time.time() - since_ts) >= required_sec
 
-        # BLE connection dropped — driven by ble_runner.py on_disconnect
+    def _check_injury_patterns(self, state):
+        """Evaluate multi-vital injury patterns against the current state.
+
+        Returns a dict of pattern_name -> bool indicating whether each
+        pattern's vital criteria are currently met (ignoring persistence).
+        """
+        hr = state.get("hr")
+        spo2 = state.get("spo2")
+        rr = state.get("rr")
+        sbp = state.get("sbp")
+        motion = state.get("motion_state") or ""
+
+        def _have(*vals):
+            return all(v is not None for v in vals)
+
+        bp_decreased = sbp is not None and sbp < SBP_NORMAL_FLOOR
+        spo2_dropping = spo2 is not None and spo2 < SPO2_NORMAL_FLOOR
+
+        patterns = {}
+
+        # Hemorrhage (ATLS classification)
+        # Class II - blood loss 750–1500 mL (15–30%)
+        # HR 100–120, BP decreased, RR 20–30
+        patterns["hemorrhage_monitor"] = (
+            _have(hr, sbp, rr)
+            and 100 <= hr <= 120
+            and bp_decreased
+            and 20 <= rr <= 30
+        )
+
+        # Class III–IV - blood loss > 1500 mL (> 30%)
+        # HR > 120, BP decreased, RR > 30
+        patterns["hemorrhage_critical"] = (
+            _have(hr, sbp, rr)
+            and hr > 120
+            and bp_decreased
+            and rr > 30
+        )
+
+        # Pneumothorax
+        # Early - elevated HR, rising RR, SpO2 starting to drop
+        patterns["pneumo_monitor"] = (
+            _have(hr, rr, spo2)
+            and hr >= 110
+            and rr >= 25
+            and spo2_dropping
+        )
+
+        # Late / tension - very high HR, high RR, SpO2 critically low,
+        # BP crashing
+        patterns["pneumo_critical"] = (
+            _have(hr, rr, spo2, sbp)
+            and hr >= 140
+            and rr > 30
+            and spo2 < 90
+            and sbp < 80
+        )
+
+        # Shock index (HR / SBP)
+        # SI 0.9+ with at least one other abnormal vital -> MONITOR
+        # SI 1.0+ with at least one other abnormal vital -> CRITICAL
+        if _have(hr, sbp) and sbp > 0:
+            si = hr / sbp
+            other_abnormal = (
+                (rr is not None and (rr >= 22 or rr <= 10))
+                or (spo2 is not None and spo2 < SPO2_NORMAL_FLOOR)
+                or bp_decreased
+            )
+            patterns["shock_index_monitor"] = si >= 0.9 and other_abnormal
+            patterns["shock_index_critical"] = si >= 1.0 and other_abnormal
+        else:
+            patterns["shock_index_monitor"] = False
+            patterns["shock_index_critical"] = False
+
+        # Fall / immobility
+        # DETECTED_FALL or STATIONARY_POST_FALL -> immediate MONITOR
+        # Prolonged STATIONARY_POST_FALL -> CRITICAL (via persistence timer)
+        patterns["fall_monitor"] = motion in ("DETECTED_FALL", "STATIONARY_POST_FALL")
+        patterns["fall_critical"] = motion == "STATIONARY_POST_FALL"
+
+        return patterns
+
+    def get_status_for_state(self, state):
+        link = state.get("data_link_status", "ACTIVE")
+
         if link == "LOST":
             return "SIGNAL LOST", "LOST"
 
-        # How long SpO2 has been below the monitor threshold
-        spo2_low_duration = (now - spo2_low_since) if spo2_low_since else 0
+        # Check persisted critical patterns
+        critical_checks = [
+            ("hemorrhage_critical_since", PATTERN_PERSIST_SEC),
+            ("pneumo_critical_since", PATTERN_PERSIST_SEC),
+            ("shock_index_critical_since", PATTERN_PERSIST_SEC),
+            ("fall_detected_since", FALL_CRITICAL_DURATION_SEC),
+        ]
+        for timer_key, duration in critical_checks:
+            if self._persisted(state.get(timer_key), duration):
+                return "CRITICAL", "CRITICAL"
 
-        # How long since a confirmed fall was first detected
-        fall_duration = (now - fall_detected_since) if fall_detected_since else 0
+        # Check persisted monitor patterns
+        monitor_checks = [
+            ("hemorrhage_monitor_since", PATTERN_PERSIST_SEC),
+            ("pneumo_monitor_since", PATTERN_PERSIST_SEC),
+            ("shock_index_monitor_since", PATTERN_PERSIST_SEC),
+            ("fall_detected_since", 0),  # fall is immediately MONITOR
+        ]
+        for timer_key, duration in monitor_checks:
+            if self._persisted(state.get(timer_key), duration):
+                return "MONITOR", "MONITOR"
 
-        # CRITICAL: SpO2 critically low for extended period
-        if spo2 < SPO2_CRITICAL_THRESHOLD and spo2_low_duration >= SPO2_ALERT_DURATION_SEC:
-            return "CRITICAL", "CRITICAL"
-
-        # CRITICAL: person has been still on the ground for too long after a fall
-        if motion == "STATIONARY_POST_FALL" and fall_duration >= FALL_CRITICAL_DURATION_SEC:
-            return "CRITICAL", "CRITICAL"
-
-        # MONITOR: SpO2 low for extended period but not yet critical
-        if spo2 < SPO2_MONITOR_THRESHOLD and spo2_low_duration >= SPO2_ALERT_DURATION_SEC:
-            return "MONITOR", "MONITOR"
-
-        # MONITOR: fall confirmed — watch until person gets up or escalates
-        if motion in ("DETECTED_FALL", "STATIONARY_POST_FALL"):
-            return "MONITOR", "MONITOR"
-
-        # All active motion states are stable — person is moving normally
         return "STABLE", "STABLE"
-    
+
     def get_battery_display(self, vbat_val):
         if vbat_val is None:
             return "--", TEXT_DIM
-        
-        pct = max(0, min(100, int((vbat_val - 3.0) / (4.2 - 3.0) * 100)))
-        
+
+        if vbat_val >= 3.5:
+            pct = int(7 + (vbat_val - 3.5) / (4.2 - 3.5) * 93)
+        else:
+            pct = int((vbat_val - 2.5) / (3.5 - 2.5) * 7)
+
+        pct = max(0, min(100, pct))
+
         if self.last_battery_pct is None:
             self.last_battery_pct = pct
         else:
             self.last_battery_pct = int(0.8 * self.last_battery_pct + 0.2 * pct)
-        
+
         p = self.last_battery_pct
         if p > 75:
-            return "█████", "#4caf50"        # full
+            return "█████", "#4caf50"
         elif p > 50:
-            return "████░", "#8bc34a"        # good
+            return "████░", "#8bc34a"
         elif p > 25:
-            return "███░░", "#f5a623"   # medium — orange
+            return "███░░", "#f5a623"
         elif p > 10:
-            return "██░░░", "#e05252"   # low — red
+            return "██░░░", "#e05252"
         else:
-            return "█░░░░", "#e05252"   # critical — red
-    
+            return "█░░░░", "#e05252"
+
     def refresh_ui_elements(self):
-        # Toggle pulse dot color each call to create a blinking animation
         self.live_pulse_on = not self.live_pulse_on
         live_color = LIVE if self.live_pulse_on else TEXT_DIM
         self.pulse_dot.setStyleSheet(f"color: {live_color}; font-size: 14px; font-weight: 800;")
@@ -662,6 +743,36 @@ class DashboardWindow(QMainWindow):
             card.set_status(status_text, status_kind)
             card.set_selected(sid in self.selected_ids)
 
+    # Persistence timer management
+    def _update_persistence_timers(self, state):
+        now = time.time()
+        patterns = self._check_injury_patterns(state)
+
+        # Map pattern names -> state timer keys (excluding fall, handled below)
+        timer_map = {
+            "hemorrhage_monitor":   "hemorrhage_monitor_since",
+            "hemorrhage_critical":  "hemorrhage_critical_since",
+            "pneumo_monitor":       "pneumo_monitor_since",
+            "pneumo_critical":      "pneumo_critical_since",
+            "shock_index_monitor":  "shock_index_monitor_since",
+            "shock_index_critical": "shock_index_critical_since",
+        }
+
+        for pattern_name, timer_key in timer_map.items():
+            if patterns.get(pattern_name, False):
+                if state.get(timer_key) is None:
+                    state[timer_key] = now
+            else:
+                state[timer_key] = None
+
+        # Fall uses a single shared timer for both monitor and critical tiers
+        fall_active = patterns.get("fall_monitor", False)
+        if fall_active:
+            if state.get("fall_detected_since") is None:
+                state["fall_detected_since"] = now
+        else:
+            state["fall_detected_since"] = None
+
     def update_soldier_data(self, soldier_id, **kwargs):
         if soldier_id not in self.soldier_state:
             self.soldier_state[soldier_id] = self.make_default_state()
@@ -669,25 +780,11 @@ class DashboardWindow(QMainWindow):
         state = self.soldier_state[soldier_id]
         for key, value in kwargs.items():
             state[key] = value
-            # Update last_motion_time for active motion states only
             if key == "motion_state" and value in ("WALKING", "RUNNING", "JUMPING_OR_QUICK_SIT"):
                 state["last_motion_time"] = time.time()
 
-        # Track how long SpO2 has been below the monitor threshold
-        spo2 = state.get("spo2", 100)
-        if spo2 is not None and spo2 < SPO2_MONITOR_THRESHOLD:
-            if state.get("spo2_low_since") is None:
-                state["spo2_low_since"] = time.time()
-        else:
-            state["spo2_low_since"] = None  # Reset if SpO2 recovers
-
-        # Track how long since a confirmed fall was first detected
-        motion = state.get("motion_state", "")
-        if motion and motion in ("DETECTED_FALL", "STATIONARY_POST_FALL"):
-            if state.get("fall_detected_since") is None:
-                state["fall_detected_since"] = time.time()
-        else:
-            state["fall_detected_since"] = None  # Reset once person is moving again
+        # Recompute all persistence timers after applying new values
+        self._update_persistence_timers(state)
 
     def handle_incoming_packet(
         self,
@@ -704,10 +801,9 @@ class DashboardWindow(QMainWindow):
         if not device_id:
             return
 
-        # Look up which soldier this device belongs to
         soldier_id = self.device_to_soldier.get(device_id)
         if soldier_id is None:
-            return  # Unknown device — not in the current roster
+            return
 
         updates = {"data_link_status": link_status}
         if hr is not None:
@@ -725,7 +821,7 @@ class DashboardWindow(QMainWindow):
             updates["sbp"] = sbp
         if dbp is not None:
             updates["dbp"] = dbp
-        
+
         self.update_soldier_data(soldier_id, **updates)
         self.refresh_ui_elements()
 
