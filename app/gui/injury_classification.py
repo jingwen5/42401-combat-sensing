@@ -20,6 +20,8 @@ NORMAL_SI = 0.7
 SI_SLOPE = 19
 SI_WINDOW_SIZE = 20
 
+LIMP_MOTION_THRESHOLD = 0.3
+
 class InjuryClassifier:
     def __init__(self):
         # buffers for most recent data
@@ -37,7 +39,7 @@ class InjuryClassifier:
         self.hemothorax = 0
         self.pneumothorax = 0
         self.injured_limb = 0
-        self.high_blast = 0
+        self.impact_injury = 0
 
     def update(self, hr, spo2, rr, sbp, dbp, motion_state):
         # add samples to right end of queue (dequeue older samples)
@@ -91,7 +93,7 @@ class InjuryClassifier:
             self.hemorrhage_bv_loss = (avg_si_recent - NORMAL_SI)/(NORMAL_SI) * SI_SLOPE
             hem_tmp = max((avg_si_recent - NORMAL_SI)*5, 0)
             self.hemorrhage = min(hem_tmp, 1)
-            return max(0.0, self.hemorrhage_bv_loss)
+            return max(0.0, self.hemorrhage_bv_loss) # bv loss should never be negative
         else:
             return None
     
@@ -148,8 +150,29 @@ class InjuryClassifier:
 
 
     # calculate probability of a limb injury (fracture,
-    # gunshot wound) or explosive blast injury
-    def calculate_limb_and_blast_injury(self):
+    # gunshot wound) or explosive blast injury / high fall impact injury
+    def calculate_limb_and_impact_injury(self):
+        limp_cnt = 0
+        motion_cnt = 0
+        stationary_cnt = 0
+        fall_detected = False
+        # count proportion of limp, and other motion events
+        for i in range(0, WINDOW_SIZE):
+            if(self.motion_buf[i] in ["LIMPING"]):
+                limp_cnt = limp_cnt + 1
+                motion_cnt = motion_cnt + 1
+            if(self.motion_buf[i] in ["WALKING", "RUNNING", "JUMPING", "SQUATTING", "SITTING"]):
+                motion_cnt = motion_cnt + 1
+            if(self.motion_buf[i] in ["STATIONARY"]):
+                stationary_cnt = stationary_cnt + 1
+            if(self.motion_buf[i] in ["DETECTED_FALL"]):
+                fall_detected = True
+        
+        limp_prop = float(limp_cnt) / float(motion_cnt)
+        
+        self.injured_limb = limp_prop
+        self.impact_injury = (fall_detected & )
+        
         pass
     
     # main fn to update all injury probabilities
@@ -157,4 +180,4 @@ class InjuryClassifier:
         self.calculate_hemorrhage()
         self.calculate_pneumothorax()
         self.calculate_hemothorax()
-        self.calculate_limb_and_blast_injury()
+        self.calculate_limb_and_impact_injury()

@@ -308,6 +308,7 @@ class DashboardWindow(QMainWindow):
             "rr": None,
             "sbp": None,
             "dbp": None,
+            "imu_impact":None,
 
             # Persistence timers
             "hemorrhage_monitor_since": None,
@@ -803,6 +804,7 @@ class DashboardWindow(QMainWindow):
             sbp=state.get("sbp"),
             dbp=state.get("dbp"),
             motion_state=state.get("motion_state"),
+            imu_impact=state.get("imu_impact"),
         )
         state["injury_probs"] = classifier.calculate_injury_probabilities()
 
@@ -817,6 +819,7 @@ class DashboardWindow(QMainWindow):
         rr=None,
         sbp=None,
         dbp=None,
+        imu_impact=None
     ):
         if not device_id:
             return
@@ -841,6 +844,8 @@ class DashboardWindow(QMainWindow):
             updates["sbp"] = sbp
         if dbp is not None:
             updates["dbp"] = dbp
+        if imu_impact is not None:
+            updates["imu_impact"] = imu_impact
 
         self.update_soldier_data(soldier_id, **updates)
         self.refresh_ui_elements()
