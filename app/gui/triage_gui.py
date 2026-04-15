@@ -733,7 +733,8 @@ class DashboardWindow(QMainWindow):
             rr_text = "--" if rr_val is None else f"{rr_val:.0f}"
 
             vbat_text, vbat_color = self.get_battery_display(vbat_val)
-
+            
+            injury_probs = state.get("injury_probs") or {}
             card.set_values(
                 "-- bpm" if hr_val is None else f"{hr_val} bpm",
                 hr_zone_text,
@@ -745,6 +746,7 @@ class DashboardWindow(QMainWindow):
                 f"{last_move_sec}s ago",
                 vbat_text,
                 vbat_color,
+                injury_probs=injury_probs,
             )
             card.set_hero_alerts(hr_val, spo2_val)
             card.set_status(status_text, status_kind)

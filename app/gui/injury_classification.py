@@ -165,7 +165,7 @@ class InjuryClassifier:
             return None
         
         # count proportion of limp, and other motion events
-        for i in range(0, WINDOW_SIZE):
+        for i in range(0, len(self.motion_buf)):
             if(self.motion_buf[i] in ["LIMPING"]):
                 limp_cnt = limp_cnt + 1
                 motion_cnt = motion_cnt + 1
@@ -175,10 +175,15 @@ class InjuryClassifier:
                 stationary_cnt = stationary_cnt + 1
             if(self.motion_buf[i] in ["DETECTED_FALL"]):
                 fall_detected = True
-                impact_magnitude = self.impact_buf[i]
+                if(i < len(self.impact_buf)):
+                    impact_magnitude = self.impact_buf[i]
+                else:
+                    impact_magnitue = 0.0
                 
-        
-        limp_prop = float(limp_cnt) / float(motion_cnt)
+        if(motion_cnt == 0):
+            limp_prop = 0.0
+        else:
+            limp_prop = float(limp_cnt) / float(motion_cnt)
         
         self.injured_limb = 1.25*(limp_prop - LIMP_MOTION_THRESHOLD)
         self.impact_injury = 0.0 if not fall_detected else 0.125*(impact_magnitude - IMPACT_THRESHOLD)
@@ -189,3 +194,12 @@ class InjuryClassifier:
         self.calculate_pneumothorax()
         self.calculate_hemothorax()
         self.calculate_limb_and_impact_injury()
+        
+        return {
+            "hemorrhage":         self.hemorrhage,
+            "hemorrhage_bv_loss": self.hemorrhage_bv_loss,
+            "hemothorax":         self.hemothorax,
+            "pneumothorax":       self.pneumothorax,
+            "injured_limb":       self.injured_limb,
+            "impact_injury":      self.impact_injury,
+        }
