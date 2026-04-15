@@ -77,34 +77,8 @@ cm = confusionchart(true_cat, pred_cat, ...
     'RowSummary', 'row-normalized', ...
     'ColumnSummary', 'column-normalized');
 
-%% 
-num_classes = length(present_classes);
-TP = zeros(num_classes, 1);
-TN = zeros(num_classes, 1);
-FP = zeros(num_classes, 1);
-FN = zeros(num_classes, 1);
-
-for i = 1:num_classes
-    cls = present_classes(i);
-    TP(i) = sum(true_labels_filt == cls & pred_labels_filt == cls);
-    TN(i) = sum(true_labels_filt ~= cls & pred_labels_filt ~= cls);
-    FP(i) = sum(true_labels_filt ~= cls & pred_labels_filt == cls);
-    FN(i) = sum(true_labels_filt == cls & pred_labels_filt ~= cls);
-end
-
-summary_table = table(present_classes(:), TP, TN, FP, FN, ...
-    'VariableNames', {'Class', 'TP', 'TN', 'FP', 'FN'});
-
-disp('--- Per-Class TP/TN/FP/FN Summary ---');
-disp(summary_table);
-
-overall_TP = sum(TP);
-overall_TN = sum(TN);
-overall_FP = sum(FP);
-overall_FN = sum(FN);
-
-fprintf('\n--- Overall Classifier Summary ---\n');
-fprintf('TP: %d\n', overall_TP);
-fprintf('TN: %d\n', overall_TN);
-fprintf('FP: %d\n', overall_FP);
-fprintf('FN: %d\n', overall_FN);
+cm = confusionchart(true_labels_filt, pred_labels_filt, ...
+    'Title', 'Motion Classifier Confusion Matrix', ...
+    'RowSummary', 'row-normalized', ...
+    'ColumnSummary', 'column-normalized', ...
+    'Order', present_classes);

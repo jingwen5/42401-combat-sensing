@@ -21,6 +21,7 @@ SI_SLOPE = 19
 SI_WINDOW_SIZE = 20
 
 LIMP_MOTION_THRESHOLD = 0.3
+IMPACT_THRESHOLD = 9
 
 class InjuryClassifier:
     def __init__(self):
@@ -32,6 +33,7 @@ class InjuryClassifier:
         self.sbp_buf = deque(maxlen=WINDOW_SIZE)
         self.dbp_buf = deque(maxlen=WINDOW_SIZE)
         self.shock_index_buf = deque(maxlen=WINDOW_SIZE)
+        self.impact_buf = deque(maxlen=WINDOW_SIZE)
 
         # probabilities of various injury
         self.hemorrhage = 0
@@ -41,7 +43,7 @@ class InjuryClassifier:
         self.injured_limb = 0
         self.impact_injury = 0
 
-    def update(self, hr, spo2, rr, sbp, dbp, motion_state):
+    def update(self, hr, spo2, rr, sbp, dbp, motion_state, imu_impact):
         # add samples to right end of queue (dequeue older samples)
         if hr is not None:
             self.hr_buf.append(hr)
@@ -55,6 +57,8 @@ class InjuryClassifier:
             self.dbp_buf.append(dbp)
         if motion_state is not None:
             self.motion_buf.append(motion_state)
+        if imu_impact is not None:
+            self.impact_buf.append(imu_impact)
         
         # calculate shock index = heart rate / systolic blood pressure
         if (sbp is not None) and (sbp != 0) and (hr is not None):
