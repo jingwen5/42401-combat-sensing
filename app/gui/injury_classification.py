@@ -20,8 +20,8 @@ NORMAL_SI = 0.7
 SI_SLOPE = 19
 SI_WINDOW_SIZE = 20
 
-LIMP_MOTION_THRESHOLD = 0.3
-IMPACT_THRESHOLD = 9
+LIMP_MOTION_THRESHOLD = 0.2
+IMPACT_THRESHOLD = 8
 
 class InjuryClassifier:
     def __init__(self):
@@ -160,6 +160,10 @@ class InjuryClassifier:
         motion_cnt = 0
         stationary_cnt = 0
         fall_detected = False
+        impact_magnitude = 0
+        if(len(self.motion_buf) < 2):
+            return None
+        
         # count proportion of limp, and other motion events
         for i in range(0, WINDOW_SIZE):
             if(self.motion_buf[i] in ["LIMPING"]):
@@ -171,13 +175,13 @@ class InjuryClassifier:
                 stationary_cnt = stationary_cnt + 1
             if(self.motion_buf[i] in ["DETECTED_FALL"]):
                 fall_detected = True
+                impact_magnitude = self.impact_buf[i]
+                
         
         limp_prop = float(limp_cnt) / float(motion_cnt)
         
-        self.injured_limb = limp_prop
-        self.impact_injury = (fall_detected & )
-        
-        pass
+        self.injured_limb = 1.25*(limp_prop - LIMP_MOTION_THRESHOLD)
+        self.impact_injury = 0.0 if not fall_detected else 0.125*(impact_magnitude - IMPACT_THRESHOLD)
     
     # main fn to update all injury probabilities
     def calculate_injury_probabilities(self):
