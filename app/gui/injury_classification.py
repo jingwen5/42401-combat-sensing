@@ -185,8 +185,8 @@ class InjuryClassifier:
         else:
             limp_prop = float(limp_cnt) / float(motion_cnt)
         
-        self.injured_limb = 1.25*(limp_prop - LIMP_MOTION_THRESHOLD)
-        self.impact_injury = 0.0 if not fall_detected else 0.125*(impact_magnitude - IMPACT_THRESHOLD)
+        self.injured_limb = max(min(0, 1.25*(limp_prop - LIMP_MOTION_THRESHOLD)), 1)
+        self.impact_injury = 0.0 if not fall_detected else max(min(0.125*(impact_magnitude - IMPACT_THRESHOLD), 0), 1)
     
     # main fn to update all injury probabilities
     def calculate_injury_probabilities(self):

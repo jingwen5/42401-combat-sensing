@@ -294,6 +294,25 @@ class DashboardWindow(QMainWindow):
                 background: transparent;
                 border: none;
             }}
+            QTabWidget#cardTabs::pane {{
+                border: none;
+                background: transparent;
+            }}
+            QTabBar::tab {{
+                background: transparent;
+                color: #556a7a;
+                padding: 5px 14px;
+                font-size: 12px;
+                border: none;
+                border-bottom: 2px solid transparent;
+            }}
+            QTabBar::tab:selected {{
+                color: {TEXT};
+                border-bottom: 2px solid {ACCENT};
+            }}
+            QTabBar::tab:hover {{
+                color: {TEXT};
+            }}
         """)
 
     def make_default_state(self):
@@ -734,7 +753,6 @@ class DashboardWindow(QMainWindow):
 
             vbat_text, vbat_color = self.get_battery_display(vbat_val)
             
-            injury_probs = state.get("injury_probs") or {}
             card.set_values(
                 "-- bpm" if hr_val is None else f"{hr_val} bpm",
                 hr_zone_text,
@@ -746,7 +764,7 @@ class DashboardWindow(QMainWindow):
                 f"{last_move_sec}s ago",
                 vbat_text,
                 vbat_color,
-                injury_probs=injury_probs,
+                injury_probs=state.get("injury_probs") or {},
             )
             card.set_hero_alerts(hr_val, spo2_val)
             card.set_status(status_text, status_kind)
@@ -799,6 +817,7 @@ class DashboardWindow(QMainWindow):
 
         # Update injury classifier with latest vitals
         classifier = state["classifier"]
+        print(f"[buf sizes — hr:{len(classifier.hr_buf)} spo2:{len(classifier.spo2_buf)} rr:{len(classifier.rr_buf)} si:{len(classifier.shock_index_buf)}")
         classifier.update(
             hr=state.get("hr"),
             spo2=state.get("spo2"),
