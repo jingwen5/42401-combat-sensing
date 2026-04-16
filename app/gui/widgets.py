@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QSpacerItem,
     QVBoxLayout,
     QWidget,
+    QTabWidget,
+    QProgressBar,
 )
 
 from gui.models import SoldierInfo
@@ -238,13 +240,29 @@ class SoldierCard(QFrame):
         header.addWidget(self.status_pill)
 
         self.root_layout.addLayout(header)
+                        
+        # Tab widget
+        self.tabs = QTabWidget()
+        self.tabs.setObjectName("cardTabs")
+        self.tabs.addTab(self._build_vitals_tab(),   "Vitals")
+        self.tabs.addTab(self._build_injuries_tab(), "Injuries")
+        self.root_layout.addWidget(self.tabs, 1)
+        
+        self.apply_scale("group_3_4")
+        self.apply_card_style()
+    
+    def _build_vitals_tab(self):
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(0, 8, 0, 0)
+        layout.setSpacing(8)
 
         divider = QFrame()
         divider.setFixedHeight(1)
         divider.setStyleSheet(f"background: {DIVIDER}; border: none;")
-        self.root_layout.addWidget(divider)
+        layout.addWidget(divider)
 
-        # Hero boxes: large HR and SpO2 values
+        # Hero boxes
         self.hero_grid = QGridLayout()
         self.hero_grid.setSpacing(8)
         self.hr_box   = self._make_hero_box("HR", "-- bpm")
@@ -257,20 +275,20 @@ class SoldierCard(QFrame):
         self.hero_grid.addWidget(self.bp_box,   1, 1)
         self.hero_grid.setColumnStretch(0, 1)
         self.hero_grid.setColumnStretch(1, 1)
-        self.root_layout.addLayout(self.hero_grid)
+        layout.addLayout(self.hero_grid)
 
-        # Detail rows: HR zone, condition, link, last movement
+        # Detail rows
         self.rows_container = QWidget()
         self.rows_container.setStyleSheet("background: transparent; border: none;")
         self.rows_layout = QVBoxLayout(self.rows_container)
-        self.rows_layout.setContentsMargins(0, 10, 0, 0)
-        self.rows_layout.setSpacing(8)
+        self.rows_layout.setContentsMargins(0, 4, 0, 0)
+        self.rows_layout.setSpacing(4)
 
-        self.hr_zone_row = self._make_detail_row("HR Zone", "--")
+        self.hr_zone_row   = self._make_detail_row("HR Zone", "--")
         self.condition_row = self._make_detail_row("Activity", "--")
-        self.link_row = self._make_detail_row("Link", "--")
+        self.link_row      = self._make_detail_row("Link", "--")
         self.last_move_row = self._make_detail_row("Last Move", "--")
-        self.vbat_row = self._make_detail_row("Battery", "--")
+        self.vbat_row      = self._make_detail_row("Battery", "--")
 
         self.rows_layout.addWidget(self.hr_zone_row["container"])
         self.rows_layout.addWidget(self.condition_row["container"])
@@ -278,12 +296,74 @@ class SoldierCard(QFrame):
         self.rows_layout.addWidget(self.last_move_row["container"])
         self.rows_layout.addWidget(self.vbat_row["container"])
 
-        self.root_layout.addWidget(self.rows_container)
         self.rows_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.root_layout.addStretch()
+        layout.addWidget(self.rows_container)
+        layout.addStretch()
 
-        self.apply_scale("group_3_4")
-        self.apply_card_style()
+        return w
+    
+    def _build_injuries_tab(self):
+        w = QWidget()
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(6)
+
+        INJURIES = [
+            ("hemorrhage",    "Hemorrhage"),
+            ("pneumothorax",  "Pneumothorax"),
+            ("hemothorax",    "Hemothorax"),
+            ("injured_limb",  "Limb injury"),
+            ("impact_injury", "Impact injury"),
+        ]
+
+        self._injury_bars = {}
+        self._injury_labels = {}
+
+        for key, display_name in INJURIES:
+            row = QHBoxLayout()
+            lbl = QLabel(display_name)
+            lbl.setFixedWidth(100)
+            lbl.setStyleSheet("font-size: 12px; color: #888;")
+
+            bar = QProgressBar()
+            bar.setRange(0, 100)
+            bar.setValue(0)
+            bar.setTextVisible(False)
+            bar.setFixedHeight(5)
+            bar.setObjectName("injuryBar")
+
+            pct_lbl = QLabel("—")
+            pct_lbl.setFixedWidth(36)
+            pct_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            pct_lbl.setStyleSheet("font-size: 12px;")
+
+            row.addWidget(lbl)
+            row.addWidget(bar, 1)
+            row.addWidget(pct_lbl)
+            layout.addLayout(row)
+
+            self._injury_bars[key] = bar
+            self._injury_labels[key] = pct_lbl
+
+        # Blood volume loss estimate
+        divider = QFrame()
+        divider.setFrameShape(QFrame.HLine)
+        divider.setStyleSheet("color: #1e3a52;")
+        layout.addWidget(divider)
+
+        bv_row = QHBoxLayout()
+        bv_lbl = QLabel("Est. blood loss")
+        bv_lbl.setStyleSheet("font-size: 12px; color: #888;")
+        self._bv_label = QLabel("—")
+        self._bv_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._bv_label.setStyleSheet("font-size: 12px; font-weight: bold;")
+        bv_row.addWidget(bv_lbl)
+        bv_row.addStretch()
+        bv_row.addWidget(self._bv_label)
+        layout.addLayout(bv_row)
+
+        layout.addStretch()
+        return w
 
     def _make_hero_box(self, label_text, value_text):
         # Large metric box used for HR and SpO2 — label on top, big value below
@@ -394,6 +474,47 @@ class SoldierCard(QFrame):
                 border-radius: 12px;
             }}
         """)
+    
+    def update_injury_probs(self, probs:dict):
+        if not probs:
+            return
+        # Color thresholds: low → gray, medium → amber, high → red
+        def bar_color(p):
+            if p >= 0.6:  return "#E24B4A"   # red
+            if p >= 0.3:  return "#EF9F27"   # amber
+            return "#888780"                  # gray
+
+        for key, bar in self._injury_bars.items():
+            p = max(0.0, min(1.0, probs.get(key) or 0.0))
+            pct = int(p * 100)
+            bar.setValue(pct)
+            color = bar_color(p)
+            bar.setStyleSheet(f"""
+                QProgressBar#injuryBar {{
+                    background: #0d1e2e;
+                    border: none;
+                    border-radius: 2px;
+                }}
+                QProgressBar#injuryBar::chunk {{
+                    background: {color};
+                    border-radius: 2px;
+                }}
+            """)
+            lbl = self._injury_labels[key]
+            if pct > 0:
+                lbl.setText(f"{pct}%")
+                lbl.setStyleSheet(f"font-size: 12px; color: {color};")
+            else:
+                lbl.setText("—")
+                lbl.setStyleSheet("font-size: 12px; color: #555;")
+
+        bv = probs.get("hemorrhage_bv_loss") or 0.0
+        if bv > 0:
+            self._bv_label.setText(f"~{bv:.1f} ml/kg")
+            self._bv_label.setStyleSheet("font-size: 12px; font-weight: bold; color: #E24B4A;")
+        else:
+            self._bv_label.setText("—")
+            self._bv_label.setStyleSheet("font-size: 12px; color: #555;")
 
     def set_values(self, hr_text, hr_zone_text, spo2_text, rr_text, bp_text, condition_text, link_text, last_move_text, vbat_text, vbat_color=None, injury_probs=None,):
         # Update all displayed values — called by refresh_ui_elements in triage_gui
@@ -411,7 +532,7 @@ class SoldierCard(QFrame):
                 f"color: {vbat_color}; background: transparent; border: none;"
             )
         if injury_probs:
-            self._update_injury_display(injury_probs)
+            self.update_injury_probs(injury_probs)
 
     def set_hero_alerts(self, hr, spo2):
         # Color each hero box independently based on how critical that value is
