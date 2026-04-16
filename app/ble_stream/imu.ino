@@ -14,6 +14,7 @@ double cal_az = -0.001846;
 
 // Note: the AY value is actually the "Z" direction due to the
 // horizontal orientation of the device
+// When vertical -> AX axis is "Z" direction
 float ax_buf[BUF_SIZE];
 float ay_buf[BUF_SIZE];
 float az_buf[BUF_SIZE];
@@ -67,8 +68,13 @@ void initialize_values() {
 
 // Read IMU, apply calibration offsets, and optionally push into circular buffers
 void update_values(bool update_buffers) {
-  cv.ax = myIMU.readFloatAccelX() - cal_ax;
-  cv.ay = myIMU.readFloatAccelY() - cal_ay;
+  // cv.ax = myIMU.readFloatAccelX() - cal_ax;
+  // cv.ay = myIMU.readFloatAccelY() - cal_ay;
+  // cv.az = myIMU.readFloatAccelZ() - cal_az;
+
+  // swap ax and ay since board is rotated
+  cv.ay = myIMU.readFloatAccelX() - cal_ax;
+  cv.ax = myIMU.readFloatAccelY() - cal_ay;
   cv.az = myIMU.readFloatAccelZ() - cal_az;
 
   cv.gx = myIMU.readFloatGyroX() - cal_gx;
