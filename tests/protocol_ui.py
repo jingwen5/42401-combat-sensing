@@ -332,20 +332,21 @@ class ProtocolUI:
             self.on_done(partial=False)
 
     def _run_countdown(self, label: str, duration: int, instruction: str):
-        self.state.update({
-            "label":       label,
-            "instruction": instruction,
-            "duration":    duration,
-            "remaining":   duration,
-            "running":     True,
-            "waiting":     False,
-        })
-        for remaining in range(duration, 0, -1):
-            self.state["remaining"] = remaining
-            if self.on_tick:
-                self.on_tick(label, remaining)
-            time.sleep(1)
-        self.state["running"] = False
+      self.state.update({
+          "label":       label,
+          "instruction": instruction,
+          "duration":    duration,
+          "remaining":   duration,
+          "running":     True,
+          "waiting":     False,
+      })
+      for remaining in range(duration, -1, -1):  # now goes to 0
+          self.state["remaining"] = remaining
+          if self.on_tick:
+              self.on_tick(label, remaining)
+          if remaining > 0:
+              time.sleep(1)
+      self.state["running"] = False
 
     def _build_app(self):
         app = Flask(__name__)

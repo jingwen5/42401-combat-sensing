@@ -219,7 +219,7 @@ plot(win_ids(valid_hr_idx), est_hr_all(valid_hr_idx), ...
     'MarkerFaceColor', C_RED)
 xlabel('Window',           'FontName', FONT, 'FontSize', FONT_SIZE)
 ylabel('Heart Rate (bpm)', 'FontName', FONT, 'FontSize', FONT_SIZE)
-title('Heart Rate: Measured vs Estimated', 'FontName', FONT, 'FontSize', TITLE_SIZE)
+% title('Heart Rate: Measured vs Estimated', 'FontName', FONT, 'FontSize', TITLE_SIZE)
 legend('Measured HR', 'Estimated HR', ...
     'Location', 'best', 'FontName', FONT, 'FontSize', LEG_SIZE, 'Box', 'off')
 text(0.02, 0.05, sprintf('MAE = %.1f bpm', mae_hr), ...
@@ -241,7 +241,7 @@ plot(win_ids(valid_spo2_idx), est_spo2_fit_all(valid_spo2_idx), ...
     'MarkerFaceColor', C_BLUE)
 xlabel('Window',   'FontName', FONT, 'FontSize', FONT_SIZE)
 ylabel('SpO2 (%)', 'FontName', FONT, 'FontSize', FONT_SIZE)
-title('SpO2: Measured vs Estimated', 'FontName', FONT, 'FontSize', TITLE_SIZE)
+% title('SpO2: Measured vs Estimated', 'FontName', FONT, 'FontSize', TITLE_SIZE)
 legend('Measured SpO2', 'Estimated SpO2', ...
     'Location', 'best', 'FontName', FONT, 'FontSize', LEG_SIZE, 'Box', 'off')
 text(0.02, 0.05, sprintf('MAE = %.1f%%', mae_spo2), ...
@@ -262,7 +262,7 @@ plot(R_line, spo2_line, '-', 'Color', C_RED, 'LineWidth', LINE_W)
 xlabel('R  =  (AC_{red}/DC_{red}) / (AC_{IR}/DC_{IR})', ...
     'FontName', FONT, 'FontSize', FONT_SIZE)
 ylabel('Measured SpO2 (%)', 'FontName', FONT, 'FontSize', FONT_SIZE)
-title('SpO2 Calibration Fit', 'FontName', FONT, 'FontSize', TITLE_SIZE)
+% title('SpO2 Calibration Fit', 'FontName', FONT, 'FontSize', TITLE_SIZE)
 legend('Calibration windows', 'Fitted line', ...
     'Location', 'best', 'FontName', FONT, 'FontSize', LEG_SIZE, 'Box', 'off')
 text(0.05, 0.12, sprintf('SpO2 = %.1f - %.1f*R', SPO2_A_fit, SPO2_B_fit), ...
@@ -389,7 +389,7 @@ xline(trim_sec, '--', 'Color', C_BLUE, 'LineWidth', 2.0, ...
     'Label', 'Trim', 'FontSize', FONT_SIZE-2, 'FontName', FONT)
 xlabel('Time (s)',             'FontName', FONT, 'FontSize', FONT_SIZE)
 ylabel('Normalized Amplitude', 'FontName', FONT, 'FontSize', FONT_SIZE)
-title('IR Signal: Raw vs Filtered', 'FontName', FONT, 'FontSize', TITLE_SIZE)
+% title('IR Signal: Raw vs Filtered', 'FontName', FONT, 'FontSize', TITLE_SIZE)
 legend('Unfiltered', 'Bandpass Filtered', 'Detected Peaks', ...
     'Location', 'best', 'FontName', FONT, 'FontSize', LEG_SIZE, 'Box', 'off')
 grid on
@@ -406,7 +406,7 @@ xline(trim_sec, '--', 'Color', C_BLUE, 'LineWidth', 2.0, ...
     'Label', 'Trim', 'FontSize', FONT_SIZE-2, 'FontName', FONT)
 xlabel('Time (s)',             'FontName', FONT, 'FontSize', FONT_SIZE)
 ylabel('Normalized Amplitude', 'FontName', FONT, 'FontSize', FONT_SIZE)
-title('Red Signal: Raw vs Filtered', 'FontName', FONT, 'FontSize', TITLE_SIZE)
+% title('Red Signal: Raw vs Filtered', 'FontName', FONT, 'FontSize', TITLE_SIZE)
 legend('Unfiltered', 'Bandpass Filtered', ...
     'Location', 'best', 'FontName', FONT, 'FontSize', LEG_SIZE, 'Box', 'off')
 grid on
@@ -422,7 +422,7 @@ plot(f_axis, P_red, '-', 'Color', C_RED,   'LineWidth', LINE_W)
 xlim([0 5])
 xlabel('Frequency (Hz)', 'FontName', FONT, 'FontSize', FONT_SIZE)
 ylabel('Amplitude',      'FontName', FONT, 'FontSize', FONT_SIZE)
-title('PPG Frequency Spectrum', 'FontName', FONT, 'FontSize', TITLE_SIZE)
+% title('PPG Frequency Spectrum', 'FontName', FONT, 'FontSize', TITLE_SIZE)
 legend('IR', 'Red', 'Location', 'best', 'FontName', FONT, 'FontSize', LEG_SIZE, 'Box', 'off')
 grid on
 applyPosterStyle(ax6);
@@ -442,7 +442,7 @@ if ~isnan(hr_est)
 end
 xlabel('Time within Window (s)', 'FontName', FONT, 'FontSize', FONT_SIZE)
 ylabel('Heart Rate (bpm)',        'FontName', FONT, 'FontSize', FONT_SIZE)
-title('Heart Rate: Reference Readings', 'FontName', FONT, 'FontSize', TITLE_SIZE)
+% title('Heart Rate: Reference Readings', 'FontName', FONT, 'FontSize', TITLE_SIZE)
 legend('Entered HR', 'Measured (median)', 'Estimated', ...
     'Location', 'best', 'FontName', FONT, 'FontSize', LEG_SIZE, 'Box', 'off')
 grid on
@@ -463,7 +463,7 @@ if ~isnan(spo2_est)
 end
 xlabel('Time within Window (s)', 'FontName', FONT, 'FontSize', FONT_SIZE)
 ylabel('SpO2 (%)',                'FontName', FONT, 'FontSize', FONT_SIZE)
-title('SpO2: Reference Readings', 'FontName', FONT, 'FontSize', TITLE_SIZE)
+% title('SpO2: Reference Readings', 'FontName', FONT, 'FontSize', TITLE_SIZE)
 legend('Entered SpO2', 'Measured (median)', 'Estimated', ...
     'Location', 'best', 'FontName', FONT, 'FontSize', LEG_SIZE, 'Box', 'off')
 grid on

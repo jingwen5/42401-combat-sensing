@@ -1,3 +1,4 @@
+# integrated_protocol.py
 import asyncio
 import threading
 import csv
@@ -12,7 +13,6 @@ from protocol_ui import ProtocolUI
 DEVICE_NAME  = "XIAO-SENSE"
 TX_CHAR_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
-# (activity label, duration in seconds, instruction shown to experimenter)
 PROTOCOL_STEPS = [
     ("PPG_WARMUP",     10, "Stand still. Do not move."),
     ("BASELINE_STILL", 30, "Stand still."),
@@ -30,7 +30,16 @@ PROTOCOL_STEPS = [
     ("SIT_QUICK",      30, "Sit down quickly from standing, then remain seated."),
 ]
 
-# Must match STATE_NAMES in ble_monitor.py and FALL_STATES enum in defines.h
+# Precompute cumulative start time of each step by index.
+# Keyed by index so duplicate labels (RECOVERY_STILL x3) are handled correctly.
+PROTOCOL_CUMULATIVE = []  # cumulative start time of step i
+PROTOCOL_DURATIONS  = []  # duration of step i
+_acc = 0
+for _label, _dur, _ in PROTOCOL_STEPS:
+    PROTOCOL_CUMULATIVE.append(_acc)
+    PROTOCOL_DURATIONS.append(_dur)
+    _acc += _dur
+
 STATE_NAMES = {
     0: "IDLE_FALL",
     1: "CHECK_FALL",
@@ -53,17 +62,29 @@ FIELDNAMES = [
     "ref_hr", "ref_spo2",
 ]
 
-data_rows: list[dict] = []
-current_label: str    = "IDLE"
-ble_connected: bool   = False
-row_lock              = threading.Lock()
+data_rows: list[dict]  = []
+current_label: str     = "IDLE"
+ble_connected: bool    = False
+row_lock               = threading.Lock()
 ref_queue: queue.Queue = queue.Queue()
 
 csv_path: Path = None
-ui: ProtocolUI = None  # Set in __main__; needed by on_tick to update BLE status
+ui: ProtocolUI = None
 
+# Protocol clock state
+p_running:        bool = False
+current_step_idx: int  = -1   # index into PROTOCOL_STEPS, -1 = not started
+current_remaining: int = 0    # remaining seconds in current step as reported by on_tick
+last_tick_wall: float = 0.0
 
-# Reassembles BLE packets from a streaming byte buffer
+def get_protocol_time() -> float:
+    if not p_running or current_step_idx < 0 or current_remaining <= 0:
+        return 0.0
+    dur             = PROTOCOL_DURATIONS[current_step_idx]
+    wall_offset     = min(time.time() - last_tick_wall, 1.0)
+    elapsed_in_step = (dur - current_remaining) + wall_offset
+    return PROTOCOL_CUMULATIVE[current_step_idx] + elapsed_in_step
+
 class PacketParser:
     def __init__(self):
         self.buf = bytearray()
@@ -130,7 +151,7 @@ class PacketParser:
                 vbat   = vbat_i / 100.0
                 decoded.append(("B", ts, vbat))
 
-            else:  # Unknown byte — skip and realign
+            else:
                 del self.buf[0]
 
         return decoded
@@ -140,8 +161,11 @@ parser = PacketParser()
 
 
 def handle_notification(sender, data: bytearray):
-    global current_label
-    ts_time = time.time()
+    # Ignore everything outside an active protocol window
+    if not p_running or current_remaining <= 0:
+        return
+
+    ts_time = get_protocol_time()
 
     for pkt in parser.feed(bytes(data)):
         ptype = pkt[0]
@@ -225,7 +249,6 @@ def on_start(initials: str) -> bool:
     ble_t = threading.Thread(target=ble_thread_main, args=(stop_event, ble_loop), daemon=True)
     ble_t.start()
 
-    # Wait up to 30s for BLE connection before returning to the browser
     timeout, elapsed = 30, 0
     while not ble_connected and elapsed < timeout:
         time.sleep(0.5)
@@ -235,6 +258,8 @@ def on_start(initials: str) -> bool:
 
 
 def on_ref(value: str) -> dict:
+    if not p_running:
+        return {"ok": False, "display": "No active window"}
     parts = value.split()
     if len(parts) == 2:
         try:
@@ -246,12 +271,23 @@ def on_ref(value: str) -> dict:
             pass
     return {"ok": False}
 
-
 def on_tick(label: str, remaining: int):
-    global current_label
-    current_label = label
-    flush_ref_queue()
+    global current_label, p_running, current_step_idx, current_remaining, last_tick_wall
 
+    prev_label     = current_label
+    p_running      = (label != "IDLE")
+
+    if p_running and label != prev_label:
+        search_from = current_step_idx + 1 if current_step_idx >= 0 else 0
+        for i in range(search_from, len(PROTOCOL_STEPS)):
+            if PROTOCOL_STEPS[i][0] == label:
+                current_step_idx = i
+                break
+
+    current_label     = label
+    current_remaining = remaining
+    last_tick_wall    = time.time()
+    flush_ref_queue()
 
 def on_done(partial: bool = False):
     flush_ref_queue()
@@ -263,7 +299,12 @@ def on_done(partial: bool = False):
 
 
 def flush_ref_queue():
-    ts_time = time.time()
+    if not p_running or current_remaining <= 0:
+        while not ref_queue.empty():
+            ref_queue.get_nowait()
+        return
+
+    ts_time = get_protocol_time()
     while not ref_queue.empty():
         hr_ref, spo2_ref = ref_queue.get_nowait()
         row = {k: "" for k in FIELDNAMES}

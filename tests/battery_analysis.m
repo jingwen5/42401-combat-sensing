@@ -31,13 +31,13 @@ figure;
 subplot(2,1,1);
 plot(drain_t, drain.vbat, 'r');
 xlabel('Time (s)'); ylabel('Vbat (V)');
-title(sprintf('Drain - Voltage (%.1f hrs)', drain_time_hr));
+% title(sprintf('Drain - Voltage (%.1f hrs)', drain_time_hr));
 grid on;
 
 subplot(2,1,2);
 plot(drain_t, drain_pct, 'r');
 xlabel('Time (s)'); ylabel('Battery (%)');
-title(sprintf('Drain - Percent (%.1f hrs)', drain_time_hr));
+% title(sprintf('Drain - Percent (%.1f hrs)', drain_time_hr));
 grid on;
 
 % Figure 2: Charge
@@ -45,11 +45,11 @@ figure;
 subplot(2,1,1);
 plot(charge_t, charge.vbat, 'b');
 xlabel('Time (s)'); ylabel('Vbat (V)');
-title(sprintf('Charge - Voltage (%.1f hrs)', charge_time_hr));
+% title(sprintf('Charge - Voltage (%.1f hrs)', charge_time_hr));
 grid on;
 
 subplot(2,1,2);
 plot(charge_t, charge_pct, 'b');
 xlabel('Time (s)'); ylabel('Battery (%)');
-title(sprintf('Charge - Percent (%.1f hrs)', charge_time_hr));
+% title(sprintf('Charge - Percent (%.1f hrs)', charge_time_hr));
 grid on;
