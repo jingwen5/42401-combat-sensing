@@ -1,6 +1,6 @@
 %% Config
 
-csv_files = {'data/integrated_HB.csv'};
+csv_files = {'data/integrated_FL.csv'};
 participant_labels = {'HB'};
 % 
 % csv_files = {

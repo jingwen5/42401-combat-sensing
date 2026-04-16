@@ -19,12 +19,12 @@ void setup() {
   }
 
   sensor.setup(
-    60,           // LED power
+    120,          // LED power
     4,            // sample average
     2,            // red + IR
     SAMPLE_RATE,  // sample rate
     411,          // pulse width
-    4096          // ADC range
+    16384         // ADC range
   );
 
   Serial.println("PPG ready.");

@@ -23,8 +23,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-PPG_OUTPUT_FILE = os.path.join(DATA_DIR, "ppg_raw_loc_a.csv")
-REF_OUTPUT_FILE = os.path.join(DATA_DIR, "ppg_ref_loc_a.csv")
+PPG_OUTPUT_FILE = os.path.join(DATA_DIR, "ppg_raw_recal.csv")
+REF_OUTPUT_FILE = os.path.join(DATA_DIR, "ppg_ref_recal.csv")
 
 WINDOW = 10.0  # seconds per window
 

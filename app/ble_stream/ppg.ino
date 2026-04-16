@@ -229,12 +229,12 @@ void ppg_setup() {
   }
 
   sensor.setup(
-    60,             // LED brightness (0–255)
+    120,             // LED brightness (0–255)
     1,               // sampleAverage — 1 means no averaging, true FS_HZ into FIFO
     2,               // ledMode — 2 = red + IR (required for SpO2)
     (int)FS_HZ,      // sampleRate (Hz) — driven by FS_HZ defined above
     411,             // pulseWidth (µs) — longer = more ADC bits, higher SNR
-    4096             // adcRange — maximum range for high-perfusion signals
+    16384            // adcRange — maximum range for high-perfusion signals
   );
 }
 

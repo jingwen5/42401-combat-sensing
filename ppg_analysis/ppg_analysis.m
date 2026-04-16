@@ -1,7 +1,7 @@
 % Analyze raw PPG daa and reference HR/SpO2 data
 %% Load data
-Tppg = readtable('data/ppg_raw_loc_a.csv');
-Tref = readtable('data/ppg_ref_loc_a.csv');
+Tppg = readtable('data/ppg_raw_temp.csv');
+Tref = readtable('data/ppg_ref_temp.csv');
 
 % Convert timestamps into datetime objects
 Tppg.timestamp = datetime(Tppg.timestamp, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSS');
@@ -11,7 +11,7 @@ Tref.timestamp = datetime(Tref.timestamp, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:s
 win_ids = unique(Tppg.window);
 
 % Choose window to analyze
-window = 13;  % 
+window = 1;  % 
 
 % Initial SpO2 calibration constants
 SPO2_A = 110;
@@ -178,8 +178,11 @@ R_fit = R_all(valid_fit_idx);
 spo2_fit = true_spo2_all(valid_fit_idx);
 
 if numel(R_fit) < 2
-    error('Not enough valid windows to fit SpO2 calibration line.')
-end
+    warning('Not enough windows to fit — using default calibration constants.');
+    SPO2_A_fit = SPO2_A;
+    SPO2_B_fit = SPO2_B;
+    p = [-SPO2_B_fit, SPO2_A_fit];  % so polyval still works for the scatter plot
+else
 
 % spo2 = m*R + c
 p = polyfit(R_fit, spo2_fit, 1);
@@ -196,6 +199,7 @@ disp(['  SPO2_A = ', num2str(SPO2_A_fit)])
 disp(['  SPO2_B = ', num2str(SPO2_B_fit)])
 disp(['  Fitted line: SpO2 = ', num2str(SPO2_A_fit), ' - ', num2str(SPO2_B_fit), ' * R'])
 
+end
 %% Recompute SpO2 estimates using fitted calibration constants
 
 est_spo2_fit_all = nan(num_windows,1);
