@@ -403,52 +403,62 @@ FALL_STATES analyze_event_score() {
     if((high_score_idx == 0) && (angle_diff >= TILT_TRIGGER)) {
         return DETECTED_FALL;
       }
+    
+    if(high_score_idx == 0) {
+      high_score_idx = -1;
+      high_score = 0;
+      for (int i = 1; i < 7; i++) {
+          if (scores[i] > high_score) {
+              high_score = scores[i];
+              high_score_idx = i;
+          }
+      }
+    }
+
+    if(high_score < MIN_SCORE) return IDLE_FALL;
 
     // probably not a true fall, handle tiebreaking with non-fall events and find
     // next closest event, if any
-    // limp vs. walk
-    if (scores[1] == scores[3]) scores[max_asvm >= 2.0f ? 1 : 3]++;
-    // limp vs. jump
-    if (scores[1] == scores[4]) scores[max_asvm >= 3.0f ? 4 : 1]++;
-    // limp vs. squat
-    if (scores[1] == scores[6]) scores[skewness >= 1.5f ? 1 : 6]++;
-    // limp vs. run
-    if (scores[1] == scores[2]) scores[max_asvm >= 3.0f ? 2 : 1]++;
-    // walk vs. squat
-    if (scores[3] == scores[6]) scores[min_asvm >= 0.5f ? 3 : 6]++;
-    // run vs. jump
-    if (scores[2] == scores[4]) scores[std_accel > 0.35f ? 2 : 4]++;
-
-#if IMU_DEBUG
-    Serial.println("Second pass scoring");
-    Serial.print("fall  score: "); Serial.print(scores[0]);
-    Serial.print("; limp  score: "); Serial.print(scores[1]);
-    Serial.print("; run   score: "); Serial.print(scores[2]);
-    Serial.print("; walk  score: "); Serial.print(scores[3]);
-    Serial.print("; jump  score: "); Serial.print(scores[4]);
-    Serial.print("; sit   score: "); Serial.print(scores[5]);
-    Serial.print("; squat score: "); Serial.println(scores[6]);
-#endif
-
-    high_score_idx = -1;
-    high_score = 0;
-
-    // find non-fall event with the highest match score
-    for(int i = 1; i < 7; i++) {
-        // strictly greater to maintain priority ranking
-        if(scores[i] > high_score) {
-            high_score = scores[i];
-            high_score_idx = i;
-        }
+    // limp one, see if there are any ties to break
+    if(high_score_idx == 1) {
+      // limp vs. jump separates best
+      if(scores[1] == scores[4]) {
+        return (max_asvm >= 3.0f) ? JUMPING : LIMPING;
+      }
+      // limp vs. squat
+      else if(scores[1] == scores[6]) {
+        return (skewness >= 1.5) ? LIMPING : SQUATTING;
+      }
+      // limp vs. run
+      else if(scores[1] == scores[2]) {
+        return (max_asvm <= 3.0f) ? LIMPING : RUNNING;
+      }
+      // limp vs. walk
+      else if(scores[1] == scores[3]) {
+        return (max_asvm >= 2.0f) ? LIMPING : WALKING;
+      }
+      else {
+        return LIMPING;
+      }
     }
 
-#if IMU_DEBUG
-    Serial.print("high score index: "); Serial.println(high_score_idx);
-#endif
+    // walking vs. squatting
+    else if (high_score_idx == 3) {
+      if(scores[3] == scores[6]) {
+        return (min_asvm >= 0.5f) ? WALKING : SQUATTING;
+      }
+      else {
+        return WALKING;
+      }
+    }
 
-    // no event matched closely enough, return IDLE
-    if(high_score < MIN_SCORE) {
-        return IDLE_FALL;
+    else if (high_score_idx == 2) {
+      if(scores[2] == scores[4]) {
+        return (std_accel > 0.35f) ? RUNNING : JUMPING;
+      }
+      else {
+        return RUNNING;
+      }
     }
 
     else {
@@ -463,6 +473,63 @@ FALL_STATES analyze_event_score() {
         default: return IDLE_FALL;
         }
     }
+    // limp vs. walk
+    // if (scores[1] == scores[3]) scores[((max_asvm >= 2.3f) & (skewness >= 1.9f)) ? 1 : 3]++;
+    // // limp vs. jump
+    // if (scores[1] == scores[4]) scores[max_asvm >= 3.0f ? 4 : 1]++;
+    // // limp vs. squat
+    // if (scores[1] == scores[6]) scores[skewness >= 1.5f ? 1 : 6]++;
+    // // limp vs. run
+    // if (scores[1] == scores[2]) scores[max_asvm >= 3.0f ? 2 : 1]++;
+    // // walk vs. squat
+    // if (scores[3] == scores[6]) scores[min_asvm >= 0.5f ? 3 : 6]++;
+    // // run vs. jump
+    // if (scores[2] == scores[4]) scores[std_accel > 0.35f ? 2 : 4]++;
+
+// #if IMU_DEBUG
+//     Serial.println("Second pass scoring");
+//     Serial.print("fall  score: "); Serial.print(scores[0]);
+//     Serial.print("; limp  score: "); Serial.print(scores[1]);
+//     Serial.print("; run   score: "); Serial.print(scores[2]);
+//     Serial.print("; walk  score: "); Serial.print(scores[3]);
+//     Serial.print("; jump  score: "); Serial.print(scores[4]);
+//     Serial.print("; sit   score: "); Serial.print(scores[5]);
+//     Serial.print("; squat score: "); Serial.println(scores[6]);
+// #endif
+
+//     high_score_idx = -1;
+//     high_score = 0;
+
+//     // find non-fall event with the highest match score
+//     for(int i = 1; i < 7; i++) {
+//         // strictly greater to maintain priority ranking
+//         if(scores[i] > high_score) {
+//             high_score = scores[i];
+//             high_score_idx = i;
+//         }
+//     }
+
+// #if IMU_DEBUG
+//     Serial.print("high score index: "); Serial.println(high_score_idx);
+// #endif
+
+//     // no event matched closely enough, return IDLE
+//     if(high_score < MIN_SCORE) {
+//         return IDLE_FALL;
+//     }
+
+//     else {
+//         switch(high_score_idx) {
+//         // case 0: return DETECTED_FALL;
+//         case 1: return LIMPING;
+//         case 2: return RUNNING;
+//         case 3: return WALKING;
+//         case 4: return JUMPING;
+//         case 5: return SITTING;
+//         case 6: return SQUATTING;
+//         default: return IDLE_FALL;
+//         }
+//     }
 
 
     // // require fall detection to include angle change to avoid false positives from priority ranking

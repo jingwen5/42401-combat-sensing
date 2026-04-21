@@ -9,11 +9,11 @@ from typing import Optional, Tuple
 
 import serial
 
-SERIAL_PORT = "COM5"
+SERIAL_PORT = "COM8"
 BAUD_RATE = 115200
 
-PERSON = "test"
-ACTIVITY = "random"
+PERSON = "lilly2"
+ACTIVITY = "limp_left_injured"
 TRIAL = 0
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
