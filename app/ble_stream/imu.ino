@@ -372,6 +372,7 @@ FALL_STATES analyze_event_score() {
     scores[6] = score_squat(std_accel, std_gyro, max_asvm, min_asvm, angle_diff, skewness);
 
 #if IMU_DEBUG
+    Serial.println("First pass scoring");
     Serial.print("fall  score: "); Serial.print(scores[0]);
     Serial.print("; limp  score: "); Serial.print(scores[1]);
     Serial.print("; run   score: "); Serial.print(scores[2]);
@@ -393,26 +394,57 @@ FALL_STATES analyze_event_score() {
         }
     }
 
+    if(high_score < MIN_SCORE) {
+      return IDLE_FALL;
+    }
+
+    // fall "wins" but make sure angle change feature is present to avoid
+    // false positives from priority ranking
+    if((high_score_idx == 0) && (angle_diff >= TILT_TRIGGER)) {
+        return DETECTED_FALL;
+      }
+
+    // probably not a true fall, handle tiebreaking with non-fall events and find
+    // next closest event, if any
+    // limp vs. walk
+    if (scores[1] == scores[3]) scores[max_asvm >= 2.0f ? 1 : 3]++;
+    // limp vs. jump
+    if (scores[1] == scores[4]) scores[max_asvm >= 3.0f ? 4 : 1]++;
+    // limp vs. squat
+    if (scores[1] == scores[6]) scores[skewness >= 1.5f ? 1 : 6]++;
+    // limp vs. run
+    if (scores[1] == scores[2]) scores[max_asvm >= 3.0f ? 2 : 1]++;
+    // walk vs. squat
+    if (scores[3] == scores[6]) scores[min_asvm >= 0.5f ? 3 : 6]++;
+    // run vs. jump
+    if (scores[2] == scores[4]) scores[std_accel > 0.35f ? 2 : 4]++;
+
+#if IMU_DEBUG
+    Serial.println("Second pass scoring");
+    Serial.print("fall  score: "); Serial.print(scores[0]);
+    Serial.print("; limp  score: "); Serial.print(scores[1]);
+    Serial.print("; run   score: "); Serial.print(scores[2]);
+    Serial.print("; walk  score: "); Serial.print(scores[3]);
+    Serial.print("; jump  score: "); Serial.print(scores[4]);
+    Serial.print("; sit   score: "); Serial.print(scores[5]);
+    Serial.print("; squat score: "); Serial.println(scores[6]);
+#endif
+
+    high_score_idx = -1;
+    high_score = 0;
+
+    // find non-fall event with the highest match score
+    for(int i = 1; i < 7; i++) {
+        // strictly greater to maintain priority ranking
+        if(scores[i] > high_score) {
+            high_score = scores[i];
+            high_score_idx = i;
+        }
+    }
+
 #if IMU_DEBUG
     Serial.print("high score index: "); Serial.println(high_score_idx);
 #endif
-
-    // require fall detection to include angle change to avoid false positives from priority ranking
-    if(high_score_idx == 0) {
-      // discriminate based on angle only
-      if(angle_diff >= TILT_TRIGGER) {
-        return DETECTED_FALL;
-      }
-      else if((scores[4] >= scores[5]) && (scores[4] >= scores[6])) {
-        return JUMPING;
-      }
-      else if((scores[5] >= scores[4]) && (scores[5] >= scores[6])) {
-        return SITTING;
-      }
-      else if((scores[6] >= scores[4]) && (scores[6] >= scores[5])) {
-        return SQUATTING;
-      }
-    }
 
     // no event matched closely enough, return IDLE
     if(high_score < MIN_SCORE) {
@@ -421,7 +453,7 @@ FALL_STATES analyze_event_score() {
 
     else {
         switch(high_score_idx) {
-        case 0: return DETECTED_FALL;
+        // case 0: return DETECTED_FALL;
         case 1: return LIMPING;
         case 2: return RUNNING;
         case 3: return WALKING;
@@ -431,6 +463,24 @@ FALL_STATES analyze_event_score() {
         default: return IDLE_FALL;
         }
     }
+
+
+    // // require fall detection to include angle change to avoid false positives from priority ranking
+    // if(high_score_idx == 0) {
+    //   // discriminate based on angle only
+    //   if(angle_diff >= TILT_TRIGGER) {
+    //     return DETECTED_FALL;
+    //   }
+    //   else if((scores[4] >= scores[5]) && (scores[4] >= scores[6])) {
+    //     return JUMPING;
+    //   }
+    //   else if((scores[5] >= scores[4]) && (scores[5] >= scores[6])) {
+    //     return SITTING;
+    //   }
+    //   else if((scores[6] >= scores[4]) && (scores[6] >= scores[5])) {
+    //     return SQUATTING;
+    //   }
+    // }
 }
 
 // M packet: ts(uint32), state(uint8), event_val(int16 x100), impact(int16 x100)
