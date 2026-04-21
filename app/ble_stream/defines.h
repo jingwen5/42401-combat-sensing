@@ -30,7 +30,8 @@ const float RAD_TO_DEG_CONV = 57.295779f;
 #define BUF_SMALL 50          // Short window used for stationary and posture checks
 
 #define TILT_TRIGGER 30       // Degrees of tilt change required to confirm a fall
-#define STATIONARY_THRESHOLD 0.15  // Max deviation from 1g to be considered stationary
+#define STATIONARY_THRESHOLD 0.1  // Max deviation from 1g to be considered stationary (acceleration)
+#define STATIONARY_GYRO_THRESHOLD 10 // degrees/sec under which the person will be considered stationary
 
 #define LIMP_SKEWNESS_THRESHOLD 1.5
 

@@ -202,8 +202,18 @@ bool check_stationary() {
   }
 
   float avg_asvm = sum / BUF_SMALL;
+  
+  sum = 0.0f;
+  for (int i = 0 ; i < BUF_SMALL; i++) {
+    sum += gsvm_buf[i];
+  }
+
+  float avg_gsvm = sum / BUF_SMALL;
+  bool is_stationary = (fabsf(avg_asvm - 1.0f) <= STATIONARY_THRESHOLD) && (fabsf(avg_gsvm) <= STATIONARY_GYRO_THRESHOLD);
   cv.fall_event_val = avg_asvm;
-  return (fabsf(avg_asvm - 1.0f) <= STATIONARY_THRESHOLD);
+  // return (fabsf(avg_asvm - 1.0f) <= STATIONARY_THRESHOLD);
+
+  return is_stationary;
 }
 
 float calculate_median(float* arr, int n) {
