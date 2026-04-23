@@ -1,7 +1,7 @@
 %% Config
 
-csv_files = {'data/integrated_KH.csv'};
-participant_labels = {'KH'};
+csv_files = {'data/integrated_LD.csv'};
+participant_labels = {'LD'};
 % 
 % csv_files = {
 %     'data/integrated_P1.csv', ...
@@ -458,79 +458,10 @@ if n_participants > 1
 end  % n_participants > 1
 
 fprintf('\nDone.\n');
-
-
-% Estimated vs true HR and SpO2 across activity windows
-
-    % Get start/end time of each activity window that actually has paired data
-    win_centers = [];
-    win_edges   = [];
-    win_ticks   = {};
-    for w = 1:numel(win_order)
-        mask_w = T.activity_label == win_order{w};
-        if ~any(mask_w), continue; end
-        t_w = T.time(mask_w);
-        t_start = min(t_w);
-        t_end   = max(t_w);
-
-        % Skip this window if no paired HR and no paired SpO2 fall inside it
-        in_hr   = any(paired_hr_t   >= t_start & paired_hr_t   <= t_end);
-        in_spo2 = any(paired_spo2_t >= t_start & paired_spo2_t <= t_end);
-        if ~in_hr && ~in_spo2, continue; end
-
-        win_centers(end+1) = (t_start + t_end) / 2;     %#ok<SAGROW>
-        win_edges(end+1)   = t_end;                     %#ok<SAGROW>
-        win_ticks{end+1}   = win_labels{w};             %#ok<SAGROW>
-    end
-
-    f = figure('Position', [100 100 900 600], 'Color', 'w');
-
-    % HR subplot
-    ax1 = subplot(2,1,1);  hold(ax1, 'on');
-    plot(ax1, paired_hr_t, paired_hr_ref, 'k-o', ...
-        'LineWidth', 1.5, 'MarkerSize', 5, 'DisplayName', 'Reference HR');
-    plot(ax1, paired_hr_t, paired_hr_ble, 'r--s', ...
-        'LineWidth', 1.5, 'MarkerSize', 5, 'DisplayName', 'Measured HR');
-    for e = 1:numel(win_edges)-1
-        xline(ax1, win_edges(e), ':', 'Color', [0.7 0.7 0.7], ...
-            'HandleVisibility', 'off');
-    end
-    ylabel(ax1, 'Heart Rate (bpm)', 'FontSize', label_fontsize);
-    legend(ax1, 'Location', 'best', 'Box', 'off', 'FontSize', fig_fontsize);
-    grid(ax1, 'on');  ax1.GridAlpha = 0.15;  ax1.GridLineStyle = ':';
-    style_ax(ax1, fig_fontsize);
-    set(ax1, 'XTick', win_centers, 'XTickLabel', win_ticks, ...
-             'XTickLabelRotation', 35, 'TickLabelInterpreter', 'none');
-
-    % SpO2 subplot
-    ax2 = subplot(2,1,2);  hold(ax2, 'on');
-    plot(ax2, paired_spo2_t, paired_spo2_ref, 'k-o', ...
-        'LineWidth', 1.5, 'MarkerSize', 5, 'DisplayName', 'Reference SpO_{2}');
-    plot(ax2, paired_spo2_t, paired_spo2_ble, 'r--s', ...
-        'LineWidth', 1.5, 'MarkerSize', 5, 'DisplayName', 'Measured SpO_{2}');
-    for e = 1:numel(win_edges)-1
-        xline(ax2, win_edges(e), ':', 'Color', [0.7 0.7 0.7], ...
-            'HandleVisibility', 'off');
-    end
-    ylabel(ax2, 'SpO_{2} (%)', 'FontSize', label_fontsize);
-    legend(ax2, 'Location', 'best', 'Box', 'off', 'FontSize', fig_fontsize);
-    grid(ax2, 'on');  ax2.GridAlpha = 0.15;  ax2.GridLineStyle = ':';
-    style_ax(ax2, fig_fontsize);
-    set(ax2, 'XTick', win_centers, 'XTickLabel', win_ticks, ...
-             'XTickLabelRotation', 35, 'TickLabelInterpreter', 'none');
-
-    linkaxes([ax1 ax2], 'x');
-    xlim(ax1, [0 max([paired_hr_t paired_spo2_t])]);
-
-    if save_figures
-        saveas(f, fullfile(output_dir, sprintf('%s_hr_spo2_vs_window.png', pid)));
-    end
     
 %% Estimated vs true HR and SpO2 across activity windows
 
-    % Sort paired arrays by time, then use sample index (1..N) on x-axis,
-    % like ppg_analysis.m uses win_ids. This avoids any line-crossing from
-    % non-monotonic time ordering.
+    % Sort paired arrays by time, then use sample index (1..N) on x-axis
     [paired_hr_t_sorted,   hr_sort_idx]   = sort(paired_hr_t);
     paired_hr_ref_sorted  = paired_hr_ref(hr_sort_idx);
     paired_hr_ble_sorted  = paired_hr_ble(hr_sort_idx);
@@ -542,8 +473,7 @@ fprintf('\nDone.\n');
     hr_idx   = 1:numel(paired_hr_t_sorted);
     spo2_idx = 1:numel(paired_spo2_t_sorted);
 
-    % Figure out which sample indices correspond to each activity label,
-    % so we can draw separators and label each activity group.
+    % Figure out which sample indices correspond to each activity label
     hr_win_centers = [];  hr_win_edges = [];  hr_win_ticks = {};
     for w = 1:numel(win_order)
         mask_w = T.activity_label == win_order{w};
@@ -587,8 +517,7 @@ fprintf('\nDone.\n');
     spo2_win_edges = sort(spo2_win_edges);
     spo2_win_ticks = spo2_win_ticks(spo2_sort_tick);
 
-    % Line styles: solid for both, thinner lines, smaller markers so the
-    % general trend is readable without marker clutter.
+    % Line styles: solid for both, thinner lines, smaller markers
     ref_color = [0 0 0];                 % black
     meas_color = [0.85 0.25 0.25];       % red (C_RED)
     ref_line_w  = 1.0;
@@ -644,7 +573,7 @@ fprintf('\nDone.\n');
     if save_figures
         saveas(f, fullfile(output_dir, sprintf('%s_hr_spo2_vs_window.png', pid)));
     end
-    
+
 %% Helpers
 
 function style_ax(ax, fsz)
