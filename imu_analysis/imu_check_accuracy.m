@@ -73,7 +73,7 @@ true_cat = categorical(true_labels_filt, present_classes);
 pred_cat = categorical(pred_labels_filt, present_classes);
 
 cm = confusionchart(true_cat, pred_cat, ...
-    'Title', 'Motion Classifier Confusion Matrix', ...
+    'Title', 'Motion Classifier Confusion Matrix' , ...
     'RowSummary', 'row-normalized', ...
     'ColumnSummary', 'column-normalized');
 
@@ -112,3 +112,63 @@ fprintf('TP RATE: %.4f\n', 100*(overall_TP / (overall_TP + overall_FN)));
 fprintf('TN RATE: %.4f\n', 100*(overall_TN / (overall_FP + overall_TN)));
 fprintf('FP RATE: %.4f\n', 100*(overall_FP / (overall_FP + overall_TN)));
 fprintf('FN RATE: %.4f\n', 100*(overall_FN / (overall_FN + overall_TP)));
+
+
+
+%% --- Merged WALKING/LIMPING Analysis ---
+% Remap both WALKING and LIMPING to WALKING_OR_LIMPING in a copy of the labels
+merged_true = true_labels_filt;
+merged_pred = pred_labels_filt;
+
+merged_true(merged_true == "WALKING" | merged_true == "LIMPING") = "WALKING_OR_LIMPING";
+merged_pred(merged_pred == "WALKING" | merged_pred == "LIMPING") = "WALKING_OR_LIMPING";
+
+% Rebuild class list with merged label
+merged_states = ["DETECTED_FALL" "RUNNING" "WALKING_OR_LIMPING" "JUMPING" "SITTING" "SQUATTING"];
+merged_classes = intersect(merged_states, unique([merged_true; merged_pred]), 'stable');
+
+% Confusion matrix figure
+figure('Name', 'Motion Classifier Confusion Matrix (Merged Walk/Limp)', 'NumberTitle', 'off');
+merged_true_cat = categorical(merged_true, merged_classes);
+merged_pred_cat = categorical(merged_pred, merged_classes);
+
+confusionchart(merged_true_cat, merged_pred_cat, ...
+    'Title', 'Motion Classifier Confusion Matrix (Merged Walk/Limp)', ...
+    'RowSummary', 'row-normalized', ...
+    'ColumnSummary', 'column-normalized');
+
+% Per-class TP/TN/FP/FN
+num_merged_classes = length(merged_classes);
+TP_m = zeros(num_merged_classes, 1);
+TN_m = zeros(num_merged_classes, 1);
+FP_m = zeros(num_merged_classes, 1);
+FN_m = zeros(num_merged_classes, 1);
+
+for i = 1:num_merged_classes
+    cls = merged_classes(i);
+    TP_m(i) = sum(merged_true == cls & merged_pred == cls);
+    TN_m(i) = sum(merged_true ~= cls & merged_pred ~= cls);
+    FP_m(i) = sum(merged_true ~= cls & merged_pred == cls);
+    FN_m(i) = sum(merged_true == cls & merged_pred ~= cls);
+end
+
+merged_table = table(merged_classes(:), TP_m, TN_m, FP_m, FN_m, ...
+    'VariableNames', {'Class', 'TP', 'TN', 'FP', 'FN'});
+
+disp('--- Per-Class TP/TN/FP/FN Summary (Merged Walk/Limp) ---');
+disp(merged_table);
+
+overall_TP_m = sum(TP_m);
+overall_TN_m = sum(TN_m);
+overall_FP_m = sum(FP_m);
+overall_FN_m = sum(FN_m);
+
+fprintf('\n--- Overall Classifier Summary (Merged Walk/Limp) ---\n');
+fprintf('TP: %d\n', overall_TP_m);
+fprintf('TN: %d\n', overall_TN_m);
+fprintf('FP: %d\n', overall_FP_m);
+fprintf('FN: %d\n', overall_FN_m);
+fprintf('TP RATE: %.4f\n', 100*(overall_TP_m / (overall_TP_m + overall_FN_m)));
+fprintf('TN RATE: %.4f\n', 100*(overall_TN_m / (overall_FP_m + overall_TN_m)));
+fprintf('FP RATE: %.4f\n', 100*(overall_FP_m / (overall_FP_m + overall_TN_m)));
+fprintf('FN RATE: %.4f\n', 100*(overall_FN_m / (overall_FN_m + overall_TP_m)));
